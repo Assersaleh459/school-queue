@@ -1,0 +1,67 @@
+{
+  "name": "school-queue",
+  "version": "1.0.0",
+  "description": "Queue management system for Al-Noor International School",
+  "author": "Vyra Systems <asserhegazy@vyra-systems.com>",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev:backend": "nodemon src/backend/server.js",
+    "dev:frontend": "cd src/frontend && npm run dev",
+    "predev": "powershell -Command \"try { $p=(Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction Stop).OwningProcess; Stop-Process -Id $p -Force; Write-Host 'Cleared port 3000' } catch { Write-Host 'Port 3000 free' }\"",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "start": "node src/backend/server.js",
+    "service:install": "pm2 start src/backend/server.js --name schoolq --restart-delay 3000 && pm2 save && pm2 startup",
+    "service:uninstall": "pm2 delete schoolq && pm2 save",
+    "service:status": "pm2 status",
+    "service:logs": "pm2 logs schoolq",
+    "electron:dev": "electron .",
+    "build:frontend": "cd src/frontend && npm run build",
+    "predist": "powershell -Command \"try { $p=(Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction Stop).OwningProcess; Stop-Process -Id $p -Force; Write-Host 'Stopped server on port 3000' } catch { Write-Host 'No server running on port 3000' }\"",
+    "dist": "npm run build:frontend && powershell -Command \"$env:CSC_IDENTITY_AUTO_DISCOVERY='false'; $env:WIN_CSC_LINK=''; electron-builder --win\"",
+    "dist:server": "npm run build:frontend && powershell -Command \"$env:CSC_IDENTITY_AUTO_DISCOVERY='false'; $env:WIN_CSC_LINK=''; node node_modules/electron-builder/out/cli/cli.js --win --config config/eb-server.json\"",
+    "dist:staff": "npm run build:frontend && powershell -Command \"$env:CSC_IDENTITY_AUTO_DISCOVERY='false'; $env:WIN_CSC_LINK=''; node node_modules/electron-builder/out/cli/cli.js --win --config config/eb-staff.json\""
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "better-sqlite3": "^12.9.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2",
+    "socket.io": "^4.6.1"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "electron": "^41.3.0",
+    "electron-builder": "^26.8.1",
+    "nodemon": "^3.0.2"
+  },
+  "build": {
+    "appId": "com.vyrasystems.schoolqueue",
+    "productName": "SchoolQ",
+    "directories": {
+      "output": "dist",
+      "buildResources": "electron"
+    },
+    "files": [
+      "electron/**/*",
+      "src/backend/**/*",
+      "src/frontend/dist/**/*",
+      "config/**/*",
+      "package.json",
+      ".env"
+    ],
+    "win": {
+      "target": ["nsis"],
+      "forceCodeSigning": false,
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "SchoolQ"
+    }
+  }
+}

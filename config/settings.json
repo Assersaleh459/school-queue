@@ -1,0 +1,17 @@
+{
+  "schoolName": "Al-Noor International School",
+  "departments": [
+    {"id": 1, "name": "Administration", "code": "ADM", "color": "#19224A"},
+    {"id": 2, "name": "Accounting", "code": "ACC", "color": "#5FAEB6"},
+    {"id": 3, "name": "Student Relations", "code": "STR", "color": "#223B73"}
+  ],
+  "branding": {
+    "primaryColor": "#19224A",
+    "secondaryColor": "#5FAEB6",
+    "logo": "/assets/logo.png"
+  },
+  "workingHours": {
+    "start": "08:00",
+    "end": "15:00"
+  }
+}

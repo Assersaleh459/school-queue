@@ -1,0 +1,34 @@
+{
+  "appId": "com.vyrasystems.schoolqueue.staff",
+  "productName": "SchoolQ Staff",
+  "directories": {
+    "output": "dist",
+    "buildResources": "electron"
+  },
+  "extraMetadata": {
+    "version": "1.2.0"
+  },
+  "extraResources": [
+    {
+      "from": "config/build-client.json",
+      "to": "build-mode.json"
+    }
+  ],
+  "files": [
+    "electron/**/*",
+    "src/frontend/dist/**/*",
+    "package.json"
+  ],
+  "win": {
+    "target": ["nsis"],
+    "forceCodeSigning": false,
+    "signAndEditExecutable": false
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "SchoolQ Staff"
+  }
+}

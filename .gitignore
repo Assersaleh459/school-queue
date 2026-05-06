@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+src/frontend/node_modules/
+
+# Build output
+src/frontend/dist/
+dist/
+
+# Database
+database/
+*.db
+*.db-shm
+*.db-wal
+
+# Environment — never commit secrets
+.env
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp
+.tmp/
+
+# Claude memory (project-local, not needed in repo)
+_claude_memory/

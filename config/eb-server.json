@@ -1,0 +1,37 @@
+{
+  "appId": "com.vyrasystems.schoolqueue.server",
+  "productName": "SchoolQ Server",
+  "directories": {
+    "output": "dist",
+    "buildResources": "electron"
+  },
+  "extraMetadata": {
+    "version": "1.2.0"
+  },
+  "extraResources": [
+    {
+      "from": "config/build-server.json",
+      "to": "build-mode.json"
+    }
+  ],
+  "files": [
+    "electron/**/*",
+    "src/backend/**/*",
+    "src/frontend/dist/**/*",
+    "config/**/*",
+    "package.json",
+    ".env"
+  ],
+  "win": {
+    "target": ["nsis"],
+    "forceCodeSigning": false,
+    "signAndEditExecutable": false
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "SchoolQ Server"
+  }
+}

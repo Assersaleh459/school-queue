@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'" />
+<title>SchoolQ — Setup</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f0f4f8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    color: #19224A;
+  }
+  .card {
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+    padding: 48px 40px;
+    width: 480px;
+  }
+  .logo { font-size: 28px; font-weight: 800; color: #19224A; }
+  .logo span { color: #5FAEB6; }
+  .subtitle { font-size: 13px; color: #888; margin-top: 4px; margin-bottom: 32px; }
+  h2 { font-size: 17px; font-weight: 700; margin-bottom: 20px; color: #19224A; }
+  .mode-options { display: flex; gap: 12px; margin-bottom: 28px; }
+  .mode-card {
+    flex: 1; border: 2px solid #e5e7eb; border-radius: 12px;
+    padding: 20px 16px; cursor: pointer; transition: all 0.15s;
+    text-align: center; user-select: none;
+  }
+  .mode-card:hover { border-color: #5FAEB6; background: #f0faf9; }
+  .mode-card.selected { border-color: #5FAEB6; background: #e6f7f8; }
+  .mode-card .icon { font-size: 32px; margin-bottom: 10px; }
+  .mode-card .title { font-weight: 700; font-size: 14px; }
+  .mode-card .desc { font-size: 12px; color: #6b7280; margin-top: 4px; line-height: 1.4; }
+  label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  input[type=text] {
+    width: 100%; padding: 12px 14px; border: 1.5px solid #e5e7eb;
+    border-radius: 8px; font-size: 14px; outline: none;
+    transition: border-color 0.15s;
+  }
+  input[type=text]:focus { border-color: #5FAEB6; }
+  .field { margin-bottom: 20px; }
+  .hint { font-size: 12px; color: #6b7280; margin-top: 6px; }
+  .ip-list { margin-top: 8px; }
+  .ip-badge {
+    display: inline-block; background: #19224A; color: #5FAEB6;
+    font-size: 13px; font-weight: 700; padding: 4px 12px;
+    border-radius: 6px; letter-spacing: 0.5px; margin-right: 6px; margin-top: 4px;
+  }
+  #client-section { display: none; }
+  .btn {
+    width: 100%; padding: 14px; border: none; border-radius: 10px;
+    font-size: 15px; font-weight: 700; cursor: pointer; transition: opacity 0.15s;
+  }
+  .btn:hover { opacity: 0.88; }
+  .btn-primary { background: #5FAEB6; color: #fff; }
+  .btn-test {
+    background: #e5e7eb; color: #374151; margin-bottom: 10px;
+    font-size: 13px; padding: 10px;
+  }
+  #status { margin-bottom: 14px; font-size: 13px; font-weight: 600; text-align: center; min-height: 20px; }
+  .ok   { color: #059669; }
+  .err  { color: #dc2626; }
+  .info { color: #2563eb; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">School<span>Q</span></div>
+  <div class="subtitle">Al-Noor International School — First-time Setup</div>
+
+  <h2 id="setup-heading">How is this machine used?</h2>
+
+  <div class="mode-options" id="mode-options">
+    <div class="mode-card selected" id="card-server" onclick="selectMode('server')">
+      <div class="icon">🖥️</div>
+      <div class="title">Server</div>
+      <div class="desc">This PC hosts the database. All others connect to it.</div>
+    </div>
+    <div class="mode-card" id="card-client" onclick="selectMode('client')">
+      <div class="icon">💻</div>
+      <div class="title">Client</div>
+      <div class="desc">This PC connects to another machine running SchoolQ Server.</div>
+    </div>
+  </div>
+
+  <div id="server-section">
+    <div class="field">
+      <label>This machine's IP address (share with client PCs):</label>
+      <div class="ip-list" id="ip-list"><em style="color:#aaa">Detecting…</em></div>
+    </div>
+  </div>
+
+  <div id="client-section">
+    <div class="field">
+      <label for="server-ip">Server IP Address</label>
+      <input type="text" id="server-ip" placeholder="e.g. 192.168.1.5" />
+      <div class="hint">Enter the IP address shown on the server machine.</div>
+    </div>
+    <button class="btn btn-test" onclick="testConnection()">Test Connection</button>
+  </div>
+
+  <div id="status"></div>
+
+  <button class="btn btn-primary" onclick="save()">Save &amp; Launch SchoolQ</button>
+</div>
+
+<script>
+  let mode = 'server';
+
+  function selectMode(m) {
+    mode = m;
+    document.getElementById('card-server').classList.toggle('selected', m === 'server');
+    document.getElementById('card-client').classList.toggle('selected', m === 'client');
+    document.getElementById('server-section').style.display = m === 'server' ? 'block' : 'none';
+    document.getElementById('client-section').style.display = m === 'client' ? 'block' : 'none';
+    document.getElementById('status').textContent = '';
+  }
+
+  function setStatus(msg, cls) {
+    const el = document.getElementById('status');
+    el.textContent = msg;
+    el.className = cls || '';
+  }
+
+  window.addEventListener('DOMContentLoaded', () => {
+    const buildMode = window.electronAPI.getBuildMode();
+
+    // Staff build: lock to client mode, hide mode selector
+    if (buildMode === 'client') {
+      document.getElementById('mode-options').style.display = 'none';
+      document.getElementById('setup-heading').textContent = 'Enter Server IP Address';
+      selectMode('client');
+    }
+
+    const ips = window.electronAPI.getLocalIPs();
+    const list = document.getElementById('ip-list');
+    if (ips.length === 0) {
+      list.innerHTML = '<em style="color:#aaa">No network adapters found</em>';
+    } else {
+      list.innerHTML = ips.map(ip => `<span class="ip-badge">${ip}</span>`).join('');
+    }
+
+    // If a previous config exists, pre-fill
+    const cfg = window.electronAPI.getConfig();
+    if (cfg) {
+      selectMode(cfg.mode || 'server');
+      if (cfg.mode === 'client') {
+        const url = new URL(cfg.serverUrl);
+        document.getElementById('server-ip').value = url.hostname;
+      }
+    }
+  });
+
+  async function testConnection() {
+    const ip = document.getElementById('server-ip').value.trim();
+    if (!ip) { setStatus('Please enter a server IP address.', 'err'); return; }
+    setStatus('Testing connection…', 'info');
+    try {
+      const res = await fetch(`http://${ip}:3000/health`, { signal: AbortSignal.timeout(5000) });
+      if (res.ok) {
+        setStatus('✓ Connected successfully!', 'ok');
+      } else {
+        setStatus('Server responded but returned an error.', 'err');
+      }
+    } catch {
+      setStatus('✗ Could not reach the server. Check the IP and make sure SchoolQ is running on the server machine.', 'err');
+    }
+  }
+
+  function save() {
+    let serverUrl = 'http://localhost:3000';
+
+    if (mode === 'client') {
+      const ip = document.getElementById('server-ip').value.trim();
+      if (!ip) { setStatus('Please enter the server IP address.', 'err'); return; }
+      serverUrl = `http://${ip}:3000`;
+    }
+
+    window.electronAPI.saveConfig({ mode, serverUrl });
+    setStatus('Saved! Launching…', 'ok');
+    setTimeout(() => window.electronAPI.relaunch(), 800);
+  }
+</script>
+</body>
+</html>
