@@ -93,7 +93,12 @@ function fetchGoogleChunk(text, lang) {
 async function googleTTS(text, lang) {
   const chunks = splitText(text.substring(0, 500));
   const bufs   = await Promise.all(chunks.map(c => fetchGoogleChunk(c, lang)));
-  return Buffer.concat(bufs);
+  const result = Buffer.concat(bufs);
+  // Google occasionally returns HTML (blocked/rate-limited) — detect by MP3 sync byte
+  if (result.length < 100 || (result[0] !== 0xFF && result[0] !== 0x49)) {
+    throw new Error(`Google TTS returned invalid audio for lang=${lang} (${result.length} bytes)`);
+  }
+  return result;
 }
 
 // ── Route ─────────────────────────────────────────────────────────────────────

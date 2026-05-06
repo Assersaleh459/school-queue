@@ -2,27 +2,56 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { useMonitorSocket } from '../lib/useSocket';
 
-// ── TTS ───────────────────────────────────────────────────────────────────────
+// ── helpers ───────────────────────────────────────────────────────────────────
 
-async function playTTS(text, lang) {
+function sleep(ms, signal) {
+  return new Promise(resolve => {
+    const t = setTimeout(resolve, ms);
+    signal?.addEventListener('abort', () => { clearTimeout(t); resolve(); }, { once: true });
+  });
+}
+
+function pickVoice(lang) {
+  if (!window.speechSynthesis) return null;
+  const voices = window.speechSynthesis.getVoices();
+  return voices
+    .filter(v => lang === 'ar' ? v.lang.startsWith('ar') : v.lang.startsWith('en'))
+    .sort((a, b) => {
+      const score = v =>
+        (v.name.includes('Neural') || v.name.includes('Online') || v.name.includes('Natural')) ? 2 :
+        (!v.localService) ? 1 : 0;
+      return score(b) - score(a);
+    })[0] || null;
+}
+
+// ── TTS ───────────────────────────────────────────────────────────────────────
+// Backend /api/tts is primary (Azure if key set, else Google TTS).
+// Web Speech API is fallback — on Edge/Windows, online Neural voices are free.
+
+async function playTTS(text, lang, signal) {
+  if (signal?.aborted) return;
   return new Promise((resolve) => {
-    const url   = `/api/tts?text=${encodeURIComponent(text)}&lang=${lang}`;
-    const audio = new Audio(url);
-    audio.onended = resolve;
-    audio.onerror = () => {
-      if (window.speechSynthesis) {
-        const u  = new SpeechSynthesisUtterance(text);
-        u.lang   = lang === 'ar' ? 'ar-EG' : 'en-US';
-        u.rate   = 0.85;
-        u.onend  = resolve;
-        u.onerror = resolve;
-        window.speechSynthesis.cancel();
-        window.speechSynthesis.speak(u);
-      } else {
-        resolve();
-      }
-    };
-    audio.play().catch(() => audio.onerror(null));
+    const timeout = setTimeout(resolve, 12000); // hard failsafe
+    const done = () => { clearTimeout(timeout); resolve(); };
+
+    const audio = new Audio(`/api/tts?text=${encodeURIComponent(text)}&lang=${lang}`);
+
+    signal?.addEventListener('abort', () => { audio.pause(); audio.src = ''; done(); }, { once: true });
+    audio.addEventListener('ended', done, { once: true });
+    audio.addEventListener('error', () => {
+      if (!window.speechSynthesis || signal?.aborted) return done();
+      const u = new SpeechSynthesisUtterance(text);
+      const v = pickVoice(lang);
+      if (v) u.voice = v;
+      u.lang = lang === 'ar' ? 'ar-EG' : 'en-US';
+      u.rate = 0.85;
+      u.addEventListener('end',   done, { once: true });
+      u.addEventListener('error', done, { once: true });
+      signal?.addEventListener('abort', () => { window.speechSynthesis.cancel(); done(); }, { once: true });
+      window.speechSynthesis.speak(u);
+    }, { once: true });
+
+    audio.play().catch(() => audio.dispatchEvent(new Event('error')));
   });
 }
 
@@ -50,37 +79,37 @@ export default function PublicDisplay() {
   const [schoolName, setSchoolName]       = useState('Al-Noor International School');
   const [currentTime, setCurrentTime]     = useState(new Date());
   const [announcements, setAnnouncements] = useState([]);
-  const [announceLang, setAnnounceLang]   = useState('en'); // drives ticker text
+  const [announceLang, setAnnounceLang]   = useState('en');
 
   // All speak-relevant settings in a ref — avoids stale closures in socket handlers
-  const s = useRef({
-    announceLang: 'en',
-    audioEnabled: true,
-    ...DEFAULTS,
-  });
+  const s = useRef({ announceLang: 'en', audioEnabled: true, ...DEFAULTS });
 
-  // TTS queue state (refs, not state — no renders needed)
+  // One AbortController per speak() call; aborting it stops audio + cancels speech
+  const abortCtrl  = useRef(null);
   const speakQueue = useRef([]);
-  const isSpeaking = useRef(false);
 
-  // drainQueue has empty deps — only touches refs, always stable
-  const drainQueue = useCallback(async () => {
-    if (isSpeaking.current || speakQueue.current.length === 0) return;
-    isSpeaking.current = true;
-    while (speakQueue.current.length > 0) {
+  // drainQueue processes the queue sequentially, respecting the abort signal
+  const drainQueue = useCallback(async (signal) => {
+    while (speakQueue.current.length > 0 && !signal.aborted) {
       const item = speakQueue.current.shift();
-      await playTTS(item.text, item.lang);
+      await playTTS(item.text, item.lang, signal);
+      // Natural pause between language blocks when using "both"
+      if (!signal.aborted && speakQueue.current.length > 0) {
+        await sleep(700, signal);
+      }
     }
-    isSpeaking.current = false;
   }, []);
 
-  // speak has [drainQueue] dep — stable since drainQueue is stable
-  // Reads all settings from s.current — never stale
+  // speak() cancels any in-flight audio, then queues and plays new announcement
   const speak = useCallback((ticketNumber, deptName, recalled) => {
     if (!s.current.audioEnabled) return;
+
+    abortCtrl.current?.abort();
     window.speechSynthesis?.cancel();
+
+    const ctrl = new AbortController();
+    abortCtrl.current = ctrl;
     speakQueue.current = [];
-    isSpeaking.current = false;
 
     const num   = parseInt(ticketNumber.split('-').pop()) || 0;
     const langs = s.current.announceLang === 'both' ? ['en', 'ar'] : [s.current.announceLang];
@@ -91,16 +120,14 @@ export default function PublicDisplay() {
         : (lang === 'ar' ? s.current.callAr   : s.current.callEn);
       speakQueue.current.push({ text: applyVars(tmpl, num, deptName), lang });
     }
-    drainQueue();
+    drainQueue(ctrl.signal);
   }, [drainQueue]);
 
-  // Stable socket callbacks — speak is stable, so these are stable too
   const onCalled   = useCallback((data) => { fetchDisplayData(); speak(data.ticket_number, data.department_name, false); }, [speak]);
-  const onRecalled = useCallback((data) => { speak(data.ticket_number, data.department_name, true); }, [speak]);
+  const onRecalled = useCallback((data) => { speak(data.ticket_number, data.department_name, true);  }, [speak]);
 
   useMonitorSocket(onCalled, onRecalled);
 
-  // Load settings — updates ref AND state (state only for ticker UI)
   const applySettings = useCallback((data) => {
     if (data.school_name) setSchoolName(data.school_name);
     const lang = data.announcement_language || 'en';
@@ -114,6 +141,12 @@ export default function PublicDisplay() {
   }, []);
 
   useEffect(() => {
+    // Preload browser voices so they're ready on first announcement
+    if (window.speechSynthesis) {
+      window.speechSynthesis.getVoices();
+      window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+    }
+
     const loadSettings = async () => {
       try { const r = await axios.get('/api/settings/public'); applySettings(r.data); } catch {}
     };
@@ -140,9 +173,8 @@ export default function PublicDisplay() {
     try { const r = await axios.get('/api/announcements'); setAnnouncements(r.data); } catch {}
   }
 
-  // Ticker text — pick correct language field
   const tickerText = announcements.map(a => {
-    if (announceLang === 'ar' && a.message_text_ar)   return a.message_text_ar;
+    if (announceLang === 'ar'   && a.message_text_ar) return a.message_text_ar;
     if (announceLang === 'both' && a.message_text_ar) return `${a.message_text}   ${a.message_text_ar}`;
     return a.message_text;
   }).join('   •   ');
