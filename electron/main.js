@@ -106,44 +106,57 @@ function createWindow(url) {
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 
+function fatal(title, detail) {
+  dialog.showErrorBox(title, detail);
+  app.quit();
+}
+
+process.on('uncaughtException', (err) => {
+  fatal('SchoolQ — Startup Error', `An unexpected error occurred:\n\n${err.message}\n\n${err.stack || ''}`);
+});
+
 app.on('ready', async () => {
   const buildMode = getBuildMode();
   const config    = getConfig();
 
-  if (buildMode === 'server') {
-    // Server build: always start backend, skip setup wizard entirely
-    await startLocalServer();
-    await waitForServer(3000, '127.0.0.1');
-    createWindow('http://localhost:3000');
-    return;
-  }
-
-  // First run (no saved config) → show setup page
-  // setup.html will auto-select client mode if buildMode === 'client'
-  if (!config) {
-    createWindow(`file://${path.join(__dirname, 'setup.html')}`);
-    return;
-  }
-
-  if (config.mode === 'server') {
-    await startLocalServer();
-    await waitForServer(3000, '127.0.0.1');
-    createWindow('http://localhost:3000');
-  } else {
-    let url;
-    try { url = new URL(config.serverUrl); }
-    catch { url = new URL('http://localhost:3000'); }
-
-    try {
-      await waitForServer(parseInt(url.port) || 3000, url.hostname, 20000);
-      createWindow(config.serverUrl);
-    } catch {
-      dialog.showErrorBox(
-        'Cannot Connect to Server',
-        `SchoolQ could not reach the server at:\n${config.serverUrl}\n\nMake sure the server machine is on and SchoolQ is running there, then restart this app.\n\nYou can reconfigure the server address from the app settings.`
-      );
-      createWindow(`file://${path.join(__dirname, 'setup.html')}`);
+  try {
+    if (buildMode === 'server') {
+      await startLocalServer();
+      await waitForServer(3000, '127.0.0.1', 30000);
+      createWindow('http://localhost:3000');
+      return;
     }
+
+    if (!config) {
+      createWindow(`file://${path.join(__dirname, 'setup.html')}`);
+      return;
+    }
+
+    if (config.mode === 'server') {
+      await startLocalServer();
+      await waitForServer(3000, '127.0.0.1', 30000);
+      createWindow('http://localhost:3000');
+    } else {
+      let url;
+      try { url = new URL(config.serverUrl); }
+      catch { url = new URL('http://localhost:3000'); }
+
+      try {
+        await waitForServer(parseInt(url.port) || 3000, url.hostname, 20000);
+        createWindow(config.serverUrl);
+      } catch {
+        dialog.showErrorBox(
+          'Cannot Connect to Server',
+          `SchoolQ could not reach the server at:\n${config.serverUrl}\n\nMake sure the server machine is on and SchoolQ Server is running there, then restart this app.`
+        );
+        createWindow(`file://${path.join(__dirname, 'setup.html')}`);
+      }
+    }
+  } catch (err) {
+    fatal(
+      'SchoolQ — Failed to Start',
+      `SchoolQ could not start the server.\n\nError: ${err.message}\n\nTry restarting the app. If the problem persists, check that port 3000 is not in use by another program.`
+    );
   }
 });
 
