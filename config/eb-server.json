@@ -1,6 +1,7 @@
 {
   "appId": "com.vyrasystems.schoolqueue.server",
   "productName": "SchoolQ Server",
+  "buildDependenciesFromSource": true,
   "directories": {
     "output": "dist",
     "buildResources": "electron"

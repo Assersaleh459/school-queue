@@ -1,6 +1,7 @@
 {
   "appId": "com.vyrasystems.schoolqueue.staff",
   "productName": "SchoolQ Staff",
+  "buildDependenciesFromSource": true,
   "directories": {
     "output": "dist",
     "buildResources": "electron"
