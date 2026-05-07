@@ -1,4 +1,5 @@
 const db = require('../database/db');
+const { getSetting } = require('../database/settingsCache');
 
 exports.getDisplayData = (req, res) => {
   const now_calling = db.prepare(
@@ -24,15 +25,11 @@ exports.getDisplayData = (req, res) => {
     'SELECT message_text FROM announcements WHERE is_active = 1 ORDER BY display_order'
   ).all();
 
-  const schoolSetting = db.prepare(
-    "SELECT setting_value FROM settings WHERE setting_key = 'school_name'"
-  ).get();
-
   res.json({
     now_calling,
     queue_counts,
     announcements,
-    school_name: schoolSetting?.setting_value || 'Al-Noor School'
+    school_name: getSetting('school_name', 'Al-Noor International School')
   });
 };
 

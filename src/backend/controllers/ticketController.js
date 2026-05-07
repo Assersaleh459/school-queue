@@ -42,6 +42,17 @@ function calculateWaitTime(dept_id) {
 
 exports.generateTicketNumber = generateTicketNumber;
 
+const createTicketTx = db.transaction((dept, category_id, parent_name, student_name, student_id, phone, purpose, priority) => {
+  const ticket_number = generateTicketNumber(dept.code, new Date(), priority);
+  const result = db.prepare(`
+    INSERT INTO tickets (
+      ticket_number, department_id, category_id, parent_name, student_name,
+      student_id, phone, purpose, priority, status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'waiting')
+  `).run(ticket_number, dept.department_id, category_id, parent_name, student_name, student_id, phone, purpose, priority);
+  return db.prepare('SELECT * FROM tickets WHERE ticket_id = ?').get(result.lastInsertRowid);
+});
+
 exports.create = (req, res) => {
   const { department_id, category_id, parent_name, student_name, student_id, phone, purpose, priority } = req.body;
 
@@ -49,17 +60,8 @@ exports.create = (req, res) => {
     const dept = db.prepare('SELECT * FROM departments WHERE department_id = ?').get(department_id);
     if (!dept) return res.status(404).json({ error: 'Department not found' });
 
-    const ticket_number = generateTicketNumber(dept.code, new Date(), priority || 'regular');
     const estimated_wait = calculateWaitTime(department_id);
-
-    const result = db.prepare(`
-      INSERT INTO tickets (
-        ticket_number, department_id, category_id, parent_name, student_name,
-        student_id, phone, purpose, priority, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'waiting')
-    `).run(ticket_number, department_id, category_id, parent_name, student_name, student_id, phone, purpose, priority || 'regular');
-
-    const ticket = db.prepare('SELECT * FROM tickets WHERE ticket_id = ?').get(result.lastInsertRowid);
+    const ticket = createTicketTx(dept, category_id, parent_name, student_name, student_id, phone, purpose, priority || 'regular');
 
     req.io.to(`dept_${department_id}`).emit('queue_updated');
 

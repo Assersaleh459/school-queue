@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../database/db');
 const bcrypt = require('bcrypt');
 const { authMiddleware, requireRole } = require('../middleware/auth');
+const { invalidate: invalidateSettingsCache } = require('../database/settingsCache');
 
 router.use(authMiddleware, requireRole('super_admin', 'admin'));
 
@@ -22,6 +23,7 @@ router.put('/settings', requireRole('super_admin'), (req, res) => {
       Object.entries(obj).forEach(([k, v]) => upsert.run(k, String(v)));
     });
     runAll(req.body);
+    invalidateSettingsCache();
     res.json({ success: true });
   } catch (error) {
     console.error('Settings save error:', error);

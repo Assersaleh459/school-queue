@@ -13,9 +13,17 @@ Al-Noor International School queue management system.
 1. Login with the default admin credentials:
    - **Username:** `admin`
    - **Password:** `admin123`
-2. Go to **Admin → Users** and create staff accounts
-3. Go to **Admin → Settings** and set the school name
-4. Go to **Admin → Departments** and configure departments
+2. **Immediately change the admin password** via Admin → Users → Edit
+3. Go to **Admin → Users** and create staff accounts
+4. Go to **Admin → Settings** and configure the school name and preferences
+5. Go to **Admin → Departments** and configure departments
+
+## Security Checklist (Before Going Live)
+
+- [ ] **Change the default admin password** (`admin123` is publicly known)
+- [ ] **Change `JWT_SECRET` in `.env`** — replace `school-queue-secret-2024-change-in-production` with a strong random string (e.g. run `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`)
+- [ ] Keep `.env` out of version control — it is already in `.gitignore`, do not commit it
+- [ ] Back up the database regularly from `C:\Users\<username>\AppData\Roaming\SchoolQ\`
 
 ## Usage
 
@@ -47,7 +55,7 @@ cd src/frontend && npm install && cd ../..
 npm run dist
 ```
 
-Output: `dist/SchoolQ Setup 1.0.0.exe`
+Output: `dist/SchoolQ Setup 1.3.1.exe`
 
 Requires: Node.js 18+, Windows build tools for native modules.
 

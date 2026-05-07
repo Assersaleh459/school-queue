@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../database/db');
+const { getSetting } = require('../database/settingsCache');
 
 router.get('/current', (req, res) => {
   try {
@@ -37,10 +38,7 @@ router.get('/current', (req, res) => {
       };
     });
 
-    const schoolRow = db.prepare("SELECT setting_value FROM settings WHERE setting_key = 'school_name'").get();
-    const school_name = schoolRow?.setting_value || 'Al-Noor International School';
-
-    res.json({ departments, display_data, school_name });
+    res.json({ departments, display_data, school_name: getSetting('school_name', 'Al-Noor International School') });
   } catch (error) {
     console.error('Display data error:', error);
     res.status(500).json({ error: 'Failed to fetch display data' });

@@ -4,17 +4,43 @@ const http = require('http');
 const path = require('path');
 const socketIO = require('socket.io');
 const dotenv = require('dotenv');
+const morgan = require('morgan');
+const compression = require('compression');
+const rateLimit = require('express-rate-limit');
 
 dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
+
+// Allow localhost (dev) and any private LAN IP (production school network)
+function isAllowedOrigin(origin) {
+  if (!origin) return true; // same-origin / non-browser requests
+  return /^https?:\/\/(localhost|127\.0\.0\.1|(192\.168|10\.\d+|172\.(1[6-9]|2\d|3[01]))\.\d+)\b/.test(origin);
+}
+
+const corsOptions = {
+  origin: (origin, cb) => cb(null, isAllowedOrigin(origin)),
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: true,
+};
+
 const io = socketIO(server, {
-  cors: { origin: '*', methods: ['GET', 'POST'] }
+  cors: { origin: (origin, cb) => cb(null, isAllowedOrigin(origin)), methods: ['GET', 'POST'] }
 });
 
-app.use(cors());
+app.use(compression());
+app.use(morgan('dev'));
+app.use(cors(corsOptions));
 app.use(express.json());
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,
+  message: { error: 'Too many login attempts. Try again in 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 const ttsRoute   = require('./routes/tts');
 const authRoutes = require('./routes/auth');
