@@ -1,5 +1,5 @@
 const db = require('../database/db');
-const { getSetting } = require('../database/settingsCache');
+const { getSetting } = require('../settingsCache');
 
 exports.getDisplayData = (req, res) => {
   const now_calling = db.prepare(

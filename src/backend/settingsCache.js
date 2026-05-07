@@ -1,4 +1,4 @@
-const db = require('./db');
+const db = require('./database/db');
 
 const TTL_MS = 30 * 1000; // 30 seconds
 let cache = null;

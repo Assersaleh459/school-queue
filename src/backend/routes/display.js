@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../database/db');
-const { getSetting } = require('../database/settingsCache');
+const { getSetting } = require('../settingsCache');
 
 router.get('/current', (req, res) => {
   try {

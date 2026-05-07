@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require('../database/db');
 const bcrypt = require('bcrypt');
 const { authMiddleware, requireRole } = require('../middleware/auth');
-const { invalidate: invalidateSettingsCache } = require('../database/settingsCache');
+const { invalidate: invalidateSettingsCache } = require('../settingsCache');
 
 router.use(authMiddleware, requireRole('super_admin', 'admin'));
 
