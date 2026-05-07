@@ -124,7 +124,7 @@ export default function PublicDisplay() {
   }, [drainQueue]);
 
   const onCalled   = useCallback((data) => { fetchDisplayData(); speak(data.ticket_number, data.department_name, false); }, [speak]);
-  const onRecalled = useCallback((data) => { speak(data.ticket_number, data.department_name, true);  }, [speak]);
+  const onRecalled = useCallback((data) => { speak(data.ticket_number, data.department_name, !!data.is_final); }, [speak]);
 
   useMonitorSocket(onCalled, onRecalled);
 

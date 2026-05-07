@@ -117,11 +117,13 @@ exports.recall = (req, res) => {
     db.prepare('UPDATE tickets SET call_count = call_count + 1 WHERE ticket_id = ?').run(ticket_id);
     const ticket = db.prepare('SELECT * FROM tickets WHERE ticket_id = ?').get(ticket_id);
     const dept = db.prepare('SELECT * FROM departments WHERE department_id = ?').get(ticket.department_id);
+    const maxCalls = parseInt(getSetting('no_show_after_calls', '3'));
 
     req.io.to('public_monitor').emit('ticket_recalled', {
       ticket_number: ticket.ticket_number,
       department_name: dept.name,
-      counter: `Counter ${dept.display_order}`
+      counter: `Counter ${dept.display_order}`,
+      is_final: ticket.call_count >= maxCalls
     });
 
     res.json({ success: true, ticket });
