@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { departmentAPI, queueAPI } from '../lib/api';
+import { departmentAPI, queueAPI, settingsAPI } from '../lib/api';
 import useAuthStore from '../store/useAuthStore';
 import { useSocket } from '../lib/useSocket';
 import ConnectionStatus from '../components/ConnectionStatus';
@@ -11,6 +11,9 @@ export default function QueueDashboard() {
   const [currentTicket, setCurrentTicket] = useState(null);
   const [stats, setStats]               = useState({ waiting_count: 0, serving_count: 0, served_today: 0 });
   const [notes, setNotes]               = useState('');
+
+  // Modals
+  const [noShowAfterCalls, setNoShowAfterCalls] = useState(3);
 
   // Modals
   const [skipModal, setSkipModal]       = useState(false);
@@ -47,6 +50,9 @@ export default function QueueDashboard() {
       .catch(() => {});
     departmentAPI.getAll()
       .then(res => setAllDepts(res.data.filter(d => d.department_id !== departmentId)))
+      .catch(() => {});
+    settingsAPI.getPublic()
+      .then(res => { if (res.data.no_show_after_calls) setNoShowAfterCalls(parseInt(res.data.no_show_after_calls)); })
       .catch(() => {});
   }, [departmentId, fetchQueue]);
 
@@ -198,11 +204,11 @@ export default function QueueDashboard() {
               </button>
               <button
                 onClick={() => setNoShowModal(true)}
-                disabled={currentTicket.call_count < 3}
-                title={currentTicket.call_count < 3 ? `Must call 3× before no-show (called ${currentTicket.call_count}×)` : 'Mark as no-show'}
+                disabled={currentTicket.call_count < noShowAfterCalls}
+                title={currentTicket.call_count < noShowAfterCalls ? `Must call ${noShowAfterCalls}× before no-show (called ${currentTicket.call_count}×)` : 'Mark as no-show'}
                 className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                NO-SHOW {currentTicket.call_count < 3 && `(${currentTicket.call_count}/3)`}
+                NO-SHOW {currentTicket.call_count < noShowAfterCalls && `(${currentTicket.call_count}/${noShowAfterCalls})`}
               </button>
             </div>
 

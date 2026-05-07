@@ -55,6 +55,7 @@ app.get('/api/settings/public', (req, res) => {
     'school_name', 'primary_color', 'working_hours_start', 'working_hours_end',
     'announcement_language', 'audio_enabled',
     'call_template_en', 'call_template_ar', 'recall_template_en', 'recall_template_ar',
+    'no_show_after_calls',
   ];
   const result = {};
   keys.forEach(k => {

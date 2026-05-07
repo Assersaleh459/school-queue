@@ -164,8 +164,11 @@ exports.noShow = (req, res) => {
     const ticket = db.prepare('SELECT * FROM tickets WHERE ticket_id = ?').get(ticket_id);
     if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
 
-    if (ticket.call_count < 3) {
-      return res.status(400).json({ error: 'Must call 3 times before no-show' });
+    const row = db.prepare("SELECT setting_value FROM settings WHERE setting_key = 'no_show_after_calls'").get();
+    const maxCalls = parseInt(row?.setting_value) || 3;
+
+    if (ticket.call_count < maxCalls) {
+      return res.status(400).json({ error: `Must call ${maxCalls} times before no-show` });
     }
 
     db.prepare(`
