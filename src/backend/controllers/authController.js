@@ -28,7 +28,7 @@ exports.login = async (req, res) => {
         department_id: user.department_id
       },
       process.env.JWT_SECRET,
-      { expiresIn: '8h' }
+      { expiresIn: '24h' }
     );
 
     res.json({
