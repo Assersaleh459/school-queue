@@ -32,7 +32,7 @@ const io = socketIO(server, {
 app.use(compression());
 app.use(morgan('dev'));
 app.use(cors(corsOptions));
-app.use(express.json());
+app.use(express.json({ limit: '5mb' })); // allow base64 logo uploads
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -81,7 +81,7 @@ app.get('/api/settings/public', (req, res) => {
     'school_name', 'primary_color', 'working_hours_start', 'working_hours_end',
     'announcement_language', 'audio_enabled',
     'call_template_en', 'call_template_ar', 'recall_template_en', 'recall_template_ar',
-    'no_show_after_calls',
+    'no_show_after_calls', 'school_logo',
   ];
   const result = {};
   keys.forEach(k => {

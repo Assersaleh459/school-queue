@@ -19,13 +19,18 @@ function RootRedirect() {
   return isAuthenticated() ? <Navigate to="/home" /> : <Navigate to="/login" />;
 }
 
-function ProtectedRoute({ children, roles = [], denyDeptStaff = false }) {
+function ProtectedRoute({ children, roles = [], page = null, denyDeptStaff = false }) {
   const { isAuthenticated, user } = useAuthStore();
 
   if (!isAuthenticated()) return <Navigate to="/login" />;
-  if (roles.length > 0 && !roles.includes(user?.role)) return <Navigate to="/" />;
 
-  // Dept-assigned staff trying to reach reception — send them to their dashboard
+  // If this user has explicit allowed_pages set, enforce them (overrides role check)
+  if (page && user?.allowed_pages) {
+    if (!user.allowed_pages.includes(page)) return <Navigate to="/home" />;
+  } else if (roles.length > 0 && !roles.includes(user?.role)) {
+    return <Navigate to="/" />;
+  }
+
   if (denyDeptStaff && user?.role === 'staff' && user?.department_id) {
     return <Navigate to="/queue" />;
   }
@@ -46,19 +51,19 @@ export default function App() {
         } />
 
         <Route path="/reception" element={
-          <ProtectedRoute roles={['super_admin', 'admin', 'staff', 'reception']} denyDeptStaff>
+          <ProtectedRoute page="reception" roles={['super_admin', 'admin', 'staff', 'reception']} denyDeptStaff>
             <Reception />
           </ProtectedRoute>
         } />
 
         <Route path="/queue" element={
-          <ProtectedRoute roles={['super_admin', 'admin', 'staff']}>
+          <ProtectedRoute page="queue" roles={['super_admin', 'admin', 'staff']}>
             <QueueDashboard />
           </ProtectedRoute>
         } />
 
         <Route path="/admin" element={
-          <ProtectedRoute roles={['super_admin', 'admin']}>
+          <ProtectedRoute page="admin" roles={['super_admin', 'admin']}>
             <Admin />
           </ProtectedRoute>
         }>
@@ -70,7 +75,7 @@ export default function App() {
         </Route>
 
         <Route path="/reports" element={
-          <ProtectedRoute roles={['super_admin', 'admin']}>
+          <ProtectedRoute page="reports" roles={['super_admin', 'admin']}>
             <Reports />
           </ProtectedRoute>
         } />

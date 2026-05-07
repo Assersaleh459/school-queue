@@ -2,7 +2,13 @@ import { useState, useEffect } from 'react';
 import { adminAPI } from '../../lib/api';
 
 const ROLES = ['staff', 'admin', 'super_admin'];
-const EMPTY = { username: '', password: '', full_name: '', role: 'staff', department_id: '', is_active: true };
+const ALL_PAGES = [
+  { key: 'reception', label: 'Reception — Create Tickets' },
+  { key: 'queue',     label: 'Queue Dashboard — Serve Tickets' },
+  { key: 'reports',   label: 'Reports' },
+  { key: 'admin',     label: 'Admin Panel' },
+];
+const EMPTY = { username: '', password: '', full_name: '', role: 'staff', department_id: '', is_active: true, allowed_pages: null };
 
 const ROLE_COLORS = {
   super_admin: 'bg-purple-100 text-purple-800',
@@ -37,9 +43,17 @@ export default function Users() {
 
   const openEdit = (u) => {
     setEditing(u);
-    setForm({ username: u.username, password: '', full_name: u.full_name, role: u.role, department_id: u.department_id || '', is_active: !!u.is_active });
+    setForm({ username: u.username, password: '', full_name: u.full_name, role: u.role, department_id: u.department_id || '', is_active: !!u.is_active, allowed_pages: u.allowed_pages || null });
     setError('');
     setShowForm(true);
+  };
+
+  const togglePage = (key) => {
+    setForm(f => {
+      const current = f.allowed_pages || [];
+      const next = current.includes(key) ? current.filter(p => p !== key) : [...current, key];
+      return { ...f, allowed_pages: next.length ? next : null };
+    });
   };
 
   const handleSave = async (e) => {
@@ -199,6 +213,26 @@ export default function Users() {
                   {departments.map(d => <option key={d.department_id} value={d.department_id}>{d.name}</option>)}
                 </select>
               </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  Screen Access
+                  <span className="ml-2 text-xs font-normal text-gray-400">(leave all unchecked = role defaults apply)</span>
+                </label>
+                <div className="border rounded-lg p-3 space-y-2">
+                  {ALL_PAGES.map(p => (
+                    <label key={p.key} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={form.allowed_pages ? form.allowed_pages.includes(p.key) : false}
+                        onChange={() => togglePage(p.key)}
+                        className="w-4 h-4 accent-teal"
+                      />
+                      <span className="text-sm text-gray-700">{p.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"

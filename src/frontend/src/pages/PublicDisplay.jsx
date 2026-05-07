@@ -77,6 +77,7 @@ export default function PublicDisplay() {
   const [departments, setDepartments]     = useState([]);
   const [displayData, setDisplayData]     = useState({});
   const [schoolName, setSchoolName]       = useState('Al-Noor International School');
+  const [schoolLogo, setSchoolLogo]       = useState(null);
   const [currentTime, setCurrentTime]     = useState(new Date());
   const [announcements, setAnnouncements] = useState([]);
   const [announceLang, setAnnounceLang]   = useState('en');
@@ -130,6 +131,7 @@ export default function PublicDisplay() {
 
   const applySettings = useCallback((data) => {
     if (data.school_name) setSchoolName(data.school_name);
+    if (data.school_logo !== undefined) setSchoolLogo(data.school_logo || null);
     const lang = data.announcement_language || 'en';
     s.current.announceLang = lang;
     setAnnounceLang(lang);
@@ -187,11 +189,14 @@ export default function PublicDisplay() {
 
       <header className="bg-navy text-white py-4 px-8 flex justify-between items-center shrink-0">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-teal rounded-full flex items-center justify-center shrink-0">
-            <span className="text-navy font-black text-lg">
-              {schoolName.split(' ').slice(0, 2).map(w => w[0]).join('')}
-            </span>
-          </div>
+          {schoolLogo
+            ? <img src={schoolLogo} alt="logo" className="w-12 h-12 object-contain rounded-full bg-white p-0.5 shrink-0" />
+            : <div className="w-12 h-12 bg-teal rounded-full flex items-center justify-center shrink-0">
+                <span className="text-navy font-black text-lg">
+                  {schoolName.split(' ').slice(0, 2).map(w => w[0]).join('')}
+                </span>
+              </div>
+          }
           <h1 className="text-3xl font-bold tracking-wide uppercase">{schoolName}</h1>
         </div>
         <div className="text-right shrink-0">

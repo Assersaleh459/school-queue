@@ -77,15 +77,16 @@ router.get('/users', (req, res) => {
 });
 
 router.post('/users', requireRole('super_admin'), async (req, res) => {
-  const { username, password, full_name, role, department_id, is_active } = req.body;
+  const { username, password, full_name, role, department_id, is_active, allowed_pages } = req.body;
   if (!username || !password || !full_name || !role) {
     return res.status(400).json({ error: 'username, password, full_name, and role are required' });
   }
   try {
     const hash = await bcrypt.hash(password, 10);
+    const pages = allowed_pages ? JSON.stringify(allowed_pages) : null;
     const result = db.prepare(
-      'INSERT INTO users (username, password_hash, full_name, role, department_id, is_active) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(username, hash, full_name, role, department_id || null, is_active ? 1 : 0);
+      'INSERT INTO users (username, password_hash, full_name, role, department_id, is_active, allowed_pages) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).run(username, hash, full_name, role, department_id || null, is_active ? 1 : 0, pages);
     res.json({ success: true, user_id: result.lastInsertRowid });
   } catch (error) {
     if (error.message.includes('UNIQUE')) return res.status(400).json({ error: 'Username already taken' });
@@ -94,7 +95,7 @@ router.post('/users', requireRole('super_admin'), async (req, res) => {
 });
 
 router.put('/users/:id', requireRole('super_admin'), async (req, res) => {
-  const { full_name, role, department_id, is_active, password } = req.body;
+  const { full_name, role, department_id, is_active, password, allowed_pages } = req.body;
   const target = db.prepare('SELECT * FROM users WHERE user_id = ?').get(req.params.id);
   if (!target) return res.status(404).json({ error: 'User not found' });
   if (target.role === 'super_admin' && is_active === 0) {
@@ -103,10 +104,11 @@ router.put('/users/:id', requireRole('super_admin'), async (req, res) => {
   try {
     let hash = target.password_hash;
     if (password) hash = await bcrypt.hash(password, 10);
+    const pages = allowed_pages !== undefined ? JSON.stringify(allowed_pages) : target.allowed_pages;
     db.prepare(`
-      UPDATE users SET full_name=?, role=?, department_id=?, is_active=?, password_hash=?
+      UPDATE users SET full_name=?, role=?, department_id=?, is_active=?, password_hash=?, allowed_pages=?
       WHERE user_id=?
-    `).run(full_name, role, department_id || null, is_active ? 1 : 0, hash, req.params.id);
+    `).run(full_name, role, department_id || null, is_active ? 1 : 0, hash, pages, req.params.id);
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Failed to update user' });

@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const db = require('../database/db');
+const { log } = require('../audit');
 
 exports.login = async (req, res) => {
   const { username, password } = req.body;
@@ -19,6 +20,7 @@ exports.login = async (req, res) => {
     }
 
     db.prepare("UPDATE users SET last_login = datetime('now') WHERE user_id = ?").run(user.user_id);
+    log(user.user_id, 'LOGIN', 'user', user.user_id, { username: user.username });
 
     const token = jwt.sign(
       {
@@ -38,7 +40,8 @@ exports.login = async (req, res) => {
         username: user.username,
         full_name: user.full_name,
         role: user.role,
-        department_id: user.department_id
+        department_id: user.department_id,
+        allowed_pages: user.allowed_pages ? JSON.parse(user.allowed_pages) : null
       }
     });
   } catch (error) {
@@ -49,9 +52,12 @@ exports.login = async (req, res) => {
 
 exports.me = (req, res) => {
   const user = db.prepare(
-    'SELECT user_id, username, full_name, role, department_id FROM users WHERE user_id = ?'
+    'SELECT user_id, username, full_name, role, department_id, allowed_pages FROM users WHERE user_id = ?'
   ).get(req.user.user_id);
-  res.json(user);
+  res.json({
+    ...user,
+    allowed_pages: user.allowed_pages ? JSON.parse(user.allowed_pages) : null
+  });
 };
 
 exports.changePassword = async (req, res) => {
@@ -73,6 +79,7 @@ exports.changePassword = async (req, res) => {
 
     const hash = await bcrypt.hash(new_password, 10);
     db.prepare('UPDATE users SET password_hash = ? WHERE user_id = ?').run(hash, user.user_id);
+    log(user.user_id, 'CHANGE_PASSWORD', 'user', user.user_id);
     res.json({ success: true });
   } catch {
     res.status(500).json({ error: 'Failed to change password' });

@@ -40,7 +40,7 @@ export default function Settings() {
         {/* Branding */}
         <section className="bg-white rounded-xl shadow-sm p-6">
           <h3 className="text-lg font-bold text-navy mb-4 pb-2 border-b">School Branding</h3>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">School Name</label>
               <input
@@ -58,6 +58,33 @@ export default function Settings() {
                 onChange={e => set('primary_color', e.target.value)}
                 className="w-full h-10 border rounded-lg cursor-pointer"
               />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">School Logo</label>
+            <div className="flex items-center gap-4">
+              {settings.school_logo && (
+                <img src={settings.school_logo} alt="School logo" className="h-16 w-16 object-contain rounded-lg border" />
+              )}
+              <div className="flex-1">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={e => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    if (file.size > 2 * 1024 * 1024) { alert('Logo must be under 2MB'); return; }
+                    const reader = new FileReader();
+                    reader.onload = ev => set('school_logo', ev.target.result);
+                    reader.readAsDataURL(file);
+                  }}
+                  className="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-teal file:text-white file:font-semibold hover:file:bg-opacity-90 cursor-pointer"
+                />
+                <p className="text-xs text-gray-400 mt-1">PNG, JPG, SVG — max 2MB. Shown on the public display screen.</p>
+              </div>
+              {settings.school_logo && (
+                <button type="button" onClick={() => set('school_logo', '')} className="text-red-500 text-sm hover:underline">Remove</button>
+              )}
             </div>
           </div>
         </section>

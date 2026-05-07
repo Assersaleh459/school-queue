@@ -1,5 +1,6 @@
 const db = require('../database/db');
 const { getSetting } = require('../settingsCache');
+const { log } = require('../audit');
 
 exports.getDisplayData = (req, res) => {
   const now_calling = db.prepare(

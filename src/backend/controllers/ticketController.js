@@ -1,4 +1,5 @@
 const db = require('../database/db');
+const { log } = require('../audit');
 
 function generateTicketNumber(dept_code, date, priority) {
   const dateStr = date.toISOString().split('T')[0].replace(/-/g, '');
@@ -64,6 +65,7 @@ exports.create = (req, res) => {
     const ticket = createTicketTx(dept, category_id, parent_name, student_name, student_id, phone, purpose, priority || 'regular');
 
     req.io.to(`dept_${department_id}`).emit('queue_updated');
+    log(req.user?.user_id, 'TICKET_CREATED', 'ticket', ticket.ticket_id, { ticket_number: ticket.ticket_number, department: dept.name, priority: ticket.priority });
 
     res.json({ success: true, ticket: { ...ticket, estimated_wait } });
   } catch (error) {
