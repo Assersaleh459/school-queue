@@ -196,7 +196,8 @@ export default function Settings() {
             Customize exactly what is spoken when a ticket is called. Leave empty to use the built-in default.
             <br />
             Variables: <code className="bg-gray-100 px-1 rounded font-mono">{'{ticket}'}</code> = ticket number,{' '}
-            <code className="bg-gray-100 px-1 rounded font-mono">{'{department}'}</code> = department name.
+            <code className="bg-gray-100 px-1 rounded font-mono">{'{department}'}</code> = department name,{' '}
+            <code className="bg-gray-100 px-1 rounded font-mono">{'{room}'}</code> = room number (set per department).
           </p>
           <div className="grid grid-cols-1 gap-4">
             <div>

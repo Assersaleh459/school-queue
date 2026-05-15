@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --color-navy: 25 34 74;
+}
+
 @media print {
   body * { visibility: hidden; }
   .print-area, .print-area * { visibility: visible; }

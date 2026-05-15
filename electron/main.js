@@ -1,9 +1,12 @@
 const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 Menu.setApplicationMenu(null);
+app.setName('SchoolQ');
 const path = require('path');
 const fs   = require('fs');
 const net  = require('net');
 const os   = require('os');
+const http = require('http');
+const { exec } = require('child_process');
 
 let mainWindow;
 const configPath = path.join(app.getPath('userData'), 'config.json');
@@ -47,6 +50,19 @@ ipcMain.on('get-local-ips',  (e)       => { e.returnValue = getLocalIPs(); });
 ipcMain.on('get-build-mode', (e)       => { e.returnValue = getBuildMode(); });
 ipcMain.on('relaunch',       ()        => { app.relaunch(); app.exit(0); });
 
+ipcMain.handle('test-server', (e, ip) => new Promise(resolve => {
+  const req = http.get(
+    { host: ip, port: 3000, path: '/api/settings/public', timeout: 5000 },
+    res => {
+      let data = '';
+      res.on('data', d => data += d);
+      res.on('end', () => { try { JSON.parse(data); resolve({ ok: true }); } catch { resolve({ ok: false }); } });
+    }
+  );
+  req.on('error', () => resolve({ ok: false }));
+  req.on('timeout', () => { req.destroy(); resolve({ ok: false }); });
+}));
+
 // ── Network helpers ───────────────────────────────────────────────────────────
 
 function isPortListening(port, host = '127.0.0.1') {
@@ -75,8 +91,31 @@ function waitForServer(port, host, timeoutMs = 20000) {
 
 // ── Server startup (server-mode only) ────────────────────────────────────────
 
+function isSchoolQOnPort3000() {
+  return new Promise(resolve => {
+    const req = http.get({ host: '127.0.0.1', port: 3000, path: '/api/settings/public', timeout: 2000 }, res => {
+      let data = '';
+      res.on('data', d => data += d);
+      res.on('end', () => { try { JSON.parse(data); resolve(true); } catch { resolve(false); } });
+    });
+    req.on('error', () => resolve(false));
+    req.on('timeout', () => { req.destroy(); resolve(false); });
+  });
+}
+
+function killPort3000() {
+  return new Promise(resolve => {
+    exec('powershell -Command "try { $p=(Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction Stop).OwningProcess; Stop-Process -Id $p -Force } catch {}"',
+      () => setTimeout(resolve, 600));
+  });
+}
+
 async function startLocalServer() {
-  if (await isPortListening(3000)) return; // already running (dev mode)
+  if (await isPortListening(3000)) {
+    if (!app.isPackaged) return; // dev mode: trust the existing server
+    if (await isSchoolQOnPort3000()) return; // already our server running
+    await killPort3000(); // foreign process — kill it, then start ours
+  }
 
   process.env.DB_PATH     = path.join(app.getPath('userData'), 'school-queue.db');
   process.env.PORT        = '3000';
@@ -97,7 +136,6 @@ function createWindow(url) {
       preload: path.join(__dirname, 'preload.js')
     },
     show: false,
-    title: 'SchoolQ — Queue Management'
   });
 
   mainWindow.loadURL(url);

@@ -1,18 +1,39 @@
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import Login from './pages/Login';
-import Home from './pages/Home';
-import Reception from './pages/Reception';
-import QueueDashboard from './pages/QueueDashboard';
-import Admin from './pages/Admin';
-import Overview from './pages/admin/Overview';
-import Departments from './pages/admin/Departments';
-import Users from './pages/admin/Users';
-import Settings from './pages/admin/Settings';
-import Announcements from './pages/admin/Announcements';
-import Reports from './pages/Reports';
-import PublicDisplay from './pages/PublicDisplay';
-import ServerSetup from './pages/ServerSetup';
+import { settingsAPI, authAPI } from './lib/api';
 import useAuthStore from './store/useAuthStore';
+
+// ── Lazy-loaded routes ────────────────────────────────────────────────────────
+const Login        = lazy(() => import('./pages/Login'));
+const Home         = lazy(() => import('./pages/Home'));
+const Reception    = lazy(() => import('./pages/Reception'));
+const QueueDashboard = lazy(() => import('./pages/QueueDashboard'));
+const Admin        = lazy(() => import('./pages/Admin'));
+const Overview     = lazy(() => import('./pages/admin/Overview'));
+const Departments  = lazy(() => import('./pages/admin/Departments'));
+const Users        = lazy(() => import('./pages/admin/Users'));
+const Settings     = lazy(() => import('./pages/admin/Settings'));
+const Announcements = lazy(() => import('./pages/admin/Announcements'));
+const AuditLog     = lazy(() => import('./pages/admin/AuditLog'));
+const QueueControl = lazy(() => import('./pages/admin/QueueControl'));
+const Reports      = lazy(() => import('./pages/Reports'));
+const PublicDisplay = lazy(() => import('./pages/PublicDisplay'));
+const ServerSetup  = lazy(() => import('./pages/ServerSetup'));
+
+// ── Loading fallback ──────────────────────────────────────────────────────────
+function PageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="text-gray-400 text-sm font-semibold animate-pulse">Loading...</div>
+    </div>
+  );
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function hexToRgb(hex) {
+  const m = hex.match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
+  return m ? `${parseInt(m[1], 16)} ${parseInt(m[2], 16)} ${parseInt(m[3], 16)}` : null;
+}
 
 function RootRedirect() {
   const { isAuthenticated } = useAuthStore();
@@ -24,10 +45,12 @@ function ProtectedRoute({ children, roles = [], page = null, denyDeptStaff = fal
 
   if (!isAuthenticated()) return <Navigate to="/login" />;
 
-  // If this user has explicit allowed_pages set, enforce them (overrides role check)
   if (page && user?.allowed_pages) {
     if (!user.allowed_pages.includes(page)) return <Navigate to="/home" />;
-  } else if (roles.length > 0 && !roles.includes(user?.role)) {
+    return children; // explicit grant — skip role/dept checks
+  }
+
+  if (roles.length > 0 && !roles.includes(user?.role)) {
     return <Navigate to="/" />;
   }
 
@@ -38,59 +61,83 @@ function ProtectedRoute({ children, roles = [], page = null, denyDeptStaff = fal
   return children;
 }
 
+// ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
+  const { isAuthenticated, updateUser } = useAuthStore();
+  // Block rendering until me() settles so ProtectedRoute always sees fresh permissions
+  const [authReady, setAuthReady] = useState(!isAuthenticated());
+
+  useEffect(() => {
+    settingsAPI.getPublic().then(res => {
+      const rgb = hexToRgb(res.data.primary_color || '');
+      if (rgb) document.documentElement.style.setProperty('--color-navy', rgb);
+      if (res.data.school_name) document.title = `${res.data.school_name} — Queue Management`;
+    }).catch(() => {});
+
+    if (isAuthenticated()) {
+      authAPI.me()
+        .then(res => updateUser(res.data))
+        .catch(() => {})
+        .finally(() => setAuthReady(true));
+    }
+  }, []);
+
+  if (!authReady) return <PageLoader />;
+
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<Login />} />
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
 
-        <Route path="/home" element={
-          <ProtectedRoute>
-            <Home />
-          </ProtectedRoute>
-        } />
+          <Route path="/home" element={
+            <ProtectedRoute>
+              <Home />
+            </ProtectedRoute>
+          } />
 
-        <Route path="/reception" element={
-          <ProtectedRoute page="reception" roles={['super_admin', 'admin', 'staff', 'reception']} denyDeptStaff>
-            <Reception />
-          </ProtectedRoute>
-        } />
+          <Route path="/reception" element={
+            <ProtectedRoute page="reception" roles={['super_admin', 'admin', 'staff', 'reception']} denyDeptStaff>
+              <Reception />
+            </ProtectedRoute>
+          } />
 
-        <Route path="/queue" element={
-          <ProtectedRoute page="queue" roles={['super_admin', 'admin', 'staff']}>
-            <QueueDashboard />
-          </ProtectedRoute>
-        } />
+          <Route path="/queue" element={
+            <ProtectedRoute page="queue" roles={['super_admin', 'admin', 'staff']}>
+              <QueueDashboard />
+            </ProtectedRoute>
+          } />
 
-        <Route path="/admin" element={
-          <ProtectedRoute page="admin" roles={['super_admin', 'admin']}>
-            <Admin />
-          </ProtectedRoute>
-        }>
-          <Route index element={<Overview />} />
-          <Route path="departments" element={<Departments />} />
-          <Route path="users" element={<Users />} />
-          <Route path="announcements" element={<Announcements />} />
-          <Route path="settings" element={<Settings />} />
-        </Route>
+          <Route path="/admin" element={
+            <ProtectedRoute page="admin" roles={['super_admin', 'admin']}>
+              <Admin />
+            </ProtectedRoute>
+          }>
+            <Route index element={<Overview />} />
+            <Route path="departments" element={<Departments />} />
+            <Route path="users" element={<Users />} />
+            <Route path="announcements" element={<Announcements />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="audit-log" element={<AuditLog />} />
+            <Route path="queue-control" element={<QueueControl />} />
+          </Route>
 
-        <Route path="/reports" element={
-          <ProtectedRoute page="reports" roles={['super_admin', 'admin']}>
-            <Reports />
-          </ProtectedRoute>
-        } />
+          <Route path="/reports" element={
+            <ProtectedRoute page="reports" roles={['super_admin', 'admin']}>
+              <Reports />
+            </ProtectedRoute>
+          } />
 
-        <Route path="/server-setup" element={
-          <ProtectedRoute roles={['super_admin']}>
-            <ServerSetup />
-          </ProtectedRoute>
-        } />
+          <Route path="/server-setup" element={
+            <ProtectedRoute roles={['super_admin']}>
+              <ServerSetup />
+            </ProtectedRoute>
+          } />
 
-        {/* Public — no auth required */}
-        <Route path="/display" element={<PublicDisplay />} />
-
-        <Route path="/" element={<RootRedirect />} />
-      </Routes>
+          <Route path="/display" element={<PublicDisplay />} />
+          <Route path="/" element={<RootRedirect />} />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

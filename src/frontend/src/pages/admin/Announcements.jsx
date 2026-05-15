@@ -6,18 +6,23 @@ const EMPTY = { message_text: '', message_text_ar: '', speak_language: 'en', dis
 const LANG_LABELS = { en: 'EN', ar: 'AR', both: 'EN+AR' };
 const LANG_COLORS = { en: 'bg-blue-100 text-blue-700', ar: 'bg-green-100 text-green-800', both: 'bg-purple-100 text-purple-700' };
 
-async function playTTS(text, lang) {
-  try {
-    const url = `/api/tts?text=${encodeURIComponent(text)}&lang=${lang}`;
-    const audio = new Audio(url);
-    await audio.play();
-  } catch {
-    if (window.speechSynthesis) {
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = lang === 'ar' ? 'ar-EG' : 'en-US';
-      window.speechSynthesis.speak(u);
-    }
-  }
+function playTTS(text, lang) {
+  return new Promise((resolve) => {
+    const audio = new Audio(`/api/tts?text=${encodeURIComponent(text)}&lang=${lang}`);
+    audio.addEventListener('ended', resolve, { once: true });
+    audio.addEventListener('error', () => {
+      if (window.speechSynthesis) {
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = lang === 'ar' ? 'ar-EG' : 'en-US';
+        u.addEventListener('end',   resolve, { once: true });
+        u.addEventListener('error', resolve, { once: true });
+        window.speechSynthesis.speak(u);
+      } else {
+        resolve();
+      }
+    }, { once: true });
+    audio.play().catch(() => audio.dispatchEvent(new Event('error')));
+  });
 }
 
 export default function Announcements() {
@@ -86,11 +91,16 @@ export default function Announcements() {
   };
 
   const handleTest = async () => {
-    const text = form.speak_language === 'ar' ? (form.message_text_ar || form.message_text) : form.message_text;
-    const lang = form.speak_language === 'ar' ? 'ar' : 'en';
-    if (!text) return;
+    if (!form.message_text) return;
     setTesting(true);
-    await playTTS(text, lang);
+    if (form.speak_language === 'both') {
+      await playTTS(form.message_text, 'en');
+      if (form.message_text_ar) await playTTS(form.message_text_ar, 'ar');
+    } else if (form.speak_language === 'ar') {
+      await playTTS(form.message_text_ar || form.message_text, 'ar');
+    } else {
+      await playTTS(form.message_text, 'en');
+    }
     setTesting(false);
   };
 
@@ -132,9 +142,14 @@ export default function Announcements() {
             <div className="flex gap-2 shrink-0">
               <button
                 onClick={async () => {
-                  const text = (a.speak_language === 'ar' && a.message_text_ar) ? a.message_text_ar : a.message_text;
-                  const lang = a.speak_language === 'ar' ? 'ar' : 'en';
-                  await playTTS(text, lang);
+                  if (a.speak_language === 'both') {
+                    await playTTS(a.message_text, 'en');
+                    if (a.message_text_ar) await playTTS(a.message_text_ar, 'ar');
+                  } else {
+                    const text = (a.speak_language === 'ar' && a.message_text_ar) ? a.message_text_ar : a.message_text;
+                    const lang = a.speak_language === 'ar' ? 'ar' : 'en';
+                    await playTTS(text, lang);
+                  }
                 }}
                 className="px-3 py-1 bg-teal text-white rounded text-sm hover:bg-opacity-80"
                 title="Preview voice"

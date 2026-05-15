@@ -26,13 +26,9 @@ export default function ServerSetup() {
     const ip = serverIp.trim();
     if (!ip) { setStatus({ type: 'err', msg: 'Enter a server IP address first.' }); return; }
     setStatus({ type: 'info', msg: 'Testing connection…' });
-    try {
-      const res = await fetch(`http://${ip}:3000/health`, { signal: AbortSignal.timeout(5000) });
-      if (res.ok) setStatus({ type: 'ok', msg: '✓ Server is reachable!' });
-      else setStatus({ type: 'err', msg: 'Server responded with an error.' });
-    } catch {
-      setStatus({ type: 'err', msg: '✗ Cannot reach server. Check the IP and make sure SchoolQ is running on that machine.' });
-    }
+    const result = await api.testServer(ip);
+    if (result.ok) setStatus({ type: 'ok', msg: '✓ Server is reachable!' });
+    else setStatus({ type: 'err', msg: '✗ Cannot reach server. Check the IP and make sure SchoolQ Server is running on that machine.' });
   };
 
   const save = () => {

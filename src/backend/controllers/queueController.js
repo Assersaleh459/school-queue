@@ -72,10 +72,13 @@ exports.callNext = (req, res) => {
     req.io.to('public_monitor').emit('ticket_called', {
       dept_id,
       department_name: dept.name,
+      department_name_ar: dept.name_ar || null,
+      department_room: dept.room_number || null,
       ticket_number: ticket.ticket_number,
       counter: `Counter ${dept.display_order}`
     });
 
+    log(staff_id, 'TICKET_CALLED', 'ticket', ticket.ticket_id, { ticket_number: ticket.ticket_number, department: dept.name });
     const updatedTicket = db.prepare('SELECT * FROM tickets WHERE ticket_id = ?').get(ticket.ticket_id);
     res.json({ success: true, ticket: updatedTicket });
   } catch (error) {
@@ -104,6 +107,7 @@ exports.complete = (req, res) => {
     `).run(duration, notes, ticket_id);
 
     req.io.to(`dept_${ticket.department_id}`).emit('queue_updated');
+    log(req.user?.user_id, 'TICKET_COMPLETED', 'ticket', ticket_id, { ticket_number: ticket.ticket_number, duration_min: duration });
 
     res.json({ success: true });
   } catch (error) {
@@ -123,10 +127,13 @@ exports.recall = (req, res) => {
     req.io.to('public_monitor').emit('ticket_recalled', {
       ticket_number: ticket.ticket_number,
       department_name: dept.name,
+      department_name_ar: dept.name_ar || null,
+      department_room: dept.room_number || null,
       counter: `Counter ${dept.display_order}`,
       is_final: ticket.call_count >= maxCalls
     });
 
+    log(req.user?.user_id, ticket.call_count >= maxCalls ? 'TICKET_FINAL_CALL' : 'TICKET_RECALLED', 'ticket', ticket.ticket_id, { ticket_number: ticket.ticket_number, call_count: ticket.call_count });
     res.json({ success: true, ticket });
   } catch (error) {
     res.status(500).json({ error: 'Failed to recall ticket' });
@@ -150,6 +157,7 @@ exports.skip = (req, res) => {
 
     const ticket = db.prepare('SELECT * FROM tickets WHERE ticket_id = ?').get(ticket_id);
     req.io.to(`dept_${ticket.department_id}`).emit('queue_updated');
+    log(req.user?.user_id, 'TICKET_SKIPPED', 'ticket', ticket_id, { ticket_number: ticket.ticket_number, reason });
 
     res.json({ success: true });
   } catch (error) {
@@ -179,6 +187,7 @@ exports.noShow = (req, res) => {
     `).run(ticket_id);
 
     req.io.to(`dept_${ticket.department_id}`).emit('queue_updated');
+    log(req.user?.user_id, 'TICKET_NO_SHOW', 'ticket', ticket_id, { ticket_number: ticket.ticket_number });
 
     res.json({ success: true });
   } catch (error) {
@@ -226,6 +235,7 @@ exports.transfer = (req, res) => {
 
     req.io.to(`dept_${original.department_id}`).emit('queue_updated');
     req.io.to(`dept_${to_dept_id}`).emit('queue_updated');
+    log(staff_id, 'TICKET_TRANSFERRED', 'ticket', ticket_id, { from: original.ticket_number, to: newTicketNumber, to_dept: toDept.name, reason });
 
     res.json({ success: true, new_ticket_number: newTicketNumber });
   } catch (error) {

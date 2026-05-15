@@ -8,6 +8,7 @@ const TILES = [
     label: 'Reception',
     description: 'Create tickets for parents',
     path: '/reception',
+    page: 'reception',
     color: '#5FAEB6',
     roles: ['super_admin', 'admin', 'staff', 'reception'],
     hiddenForDeptStaff: true,
@@ -17,6 +18,7 @@ const TILES = [
     label: 'Queue Dashboard',
     description: 'Call and serve tickets',
     path: '/queue',
+    page: 'queue',
     color: '#19224A',
     roles: ['super_admin', 'admin', 'staff'],
     requiresDept: true,
@@ -26,6 +28,7 @@ const TILES = [
     label: 'Admin Panel',
     description: 'Manage users, departments, settings',
     path: '/admin',
+    page: 'admin',
     color: '#223B73',
     roles: ['super_admin', 'admin'],
     icon: '⚙️'
@@ -34,6 +37,7 @@ const TILES = [
     label: 'Reports',
     description: 'Daily summaries and exports',
     path: '/reports',
+    page: 'reports',
     color: '#2563eb',
     roles: ['super_admin', 'admin'],
     icon: '📊'
@@ -42,6 +46,7 @@ const TILES = [
     label: 'Display Monitor',
     description: 'Public queue display screen',
     path: '/display',
+    page: null,
     color: '#059669',
     roles: ['super_admin', 'admin', 'staff'],
     icon: '📺'
@@ -62,6 +67,10 @@ export default function Home() {
   }, []);
 
   const visible = TILES.filter(t => {
+    if (user?.allowed_pages) {
+      if (!t.page) return false; // uncontrollable tile (Display Monitor) — hide when access is restricted
+      return user.allowed_pages.includes(t.page);
+    }
     if (!t.roles.includes(user?.role)) return false;
     if (t.requiresDept && !user?.department_id) return false;
     if (t.hiddenForDeptStaff && user?.role === 'staff' && user?.department_id) return false;

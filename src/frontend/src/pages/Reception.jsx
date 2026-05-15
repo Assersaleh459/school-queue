@@ -5,9 +5,9 @@ import useAuthStore from '../store/useAuthStore';
 import TicketReceipt from '../components/TicketReceipt';
 
 export default function Reception() {
-  const [departments, setDepartments] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [formData, setFormData] = useState({
+  const [departments, setDepartments]     = useState([]);
+  const [categories, setCategories]       = useState([]);
+  const [formData, setFormData]           = useState({
     department_id: '',
     category_id: '',
     parent_name: '',
@@ -17,51 +17,58 @@ export default function Reception() {
     purpose: '',
     priority: 'regular'
   });
-  const [estimatedWait, setEstimatedWait] = useState(null);
-  const [createdTicket, setCreatedTicket] = useState(null);
+  const [waitingCount, setWaitingCount]   = useState(null);
   const [queuePosition, setQueuePosition] = useState(null);
-  const [schoolName, setSchoolName] = useState('Al-Noor School');
+  const [waitEstimate, setWaitEstimate]   = useState(null); // { minutes, ahead, perService }
+  const [createdTicket, setCreatedTicket] = useState(null);
+  const [schoolName, setSchoolName]       = useState('Al-Noor School');
 
-  const user = useAuthStore(state => state.user);
+  const user   = useAuthStore(state => state.user);
   const logout = useAuthStore(state => state.logout);
   const navigate = useNavigate();
 
   useEffect(() => {
-    loadDepartments();
+    departmentAPI.getAll().then(r => setDepartments(r.data)).catch(() => {});
     settingsAPI.getPublic()
       .then(res => { if (res.data.school_name) setSchoolName(res.data.school_name); })
       .catch(() => {});
   }, []);
 
+  // When department changes — load categories + queue count
   useEffect(() => {
-    if (formData.department_id) {
-      loadCategories(formData.department_id);
-      loadQueueInfo(formData.department_id);
+    if (!formData.department_id) {
+      setCategories([]);
+      setWaitingCount(null);
+      setQueuePosition(null);
+      setWaitEstimate(null);
+      return;
     }
+    departmentAPI.getCategories(formData.department_id)
+      .then(r => setCategories(r.data)).catch(() => {});
+    departmentAPI.getQueue(formData.department_id).then(r => {
+      setWaitingCount(r.data.length);
+      setQueuePosition(r.data.length + 1);
+    }).catch(() => {});
   }, [formData.department_id]);
 
-  const loadDepartments = async () => {
-    const res = await departmentAPI.getAll();
-    setDepartments(res.data);
-  };
+  // Recalculate estimate when category selection, categories list, or waitingCount changes
+  useEffect(() => {
+    if (waitingCount === null) { setWaitEstimate(null); return; }
 
-  const loadCategories = async (deptId) => {
-    const res = await departmentAPI.getCategories(deptId);
-    setCategories(res.data);
-  };
-
-  const loadQueueInfo = async (deptId) => {
-    const queue = await departmentAPI.getQueue(deptId);
-    setQueuePosition(queue.data.length + 1);
-
-    const stats = await departmentAPI.getStats(deptId);
-    const avgWait = stats.data.waiting_count * 5;
-    setEstimatedWait(avgWait);
-  };
+    let perService = 5;
+    if (formData.category_id) {
+      const cat = categories.find(c => String(c.category_id) === String(formData.category_id));
+      if (cat) perService = cat.estimated_time_minutes;
+    } else if (categories.length > 0) {
+      perService = Math.round(
+        categories.reduce((s, c) => s + c.estimated_time_minutes, 0) / categories.length
+      );
+    }
+    setWaitEstimate({ minutes: waitingCount * perService, ahead: waitingCount, perService });
+  }, [formData.category_id, categories, waitingCount]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     try {
       const res = await ticketAPI.create(formData);
       setCreatedTicket(res.data.ticket);
@@ -71,18 +78,10 @@ export default function Reception() {
   };
 
   const resetForm = () => {
-    setFormData({
-      department_id: '',
-      category_id: '',
-      parent_name: '',
-      student_name: '',
-      student_id: '',
-      phone: '',
-      purpose: '',
-      priority: 'regular'
-    });
+    setFormData({ department_id: '', category_id: '', parent_name: '', student_name: '', student_id: '', phone: '', purpose: '', priority: 'regular' });
     setCreatedTicket(null);
-    setEstimatedWait(null);
+    setWaitEstimate(null);
+    setWaitingCount(null);
     setQueuePosition(null);
   };
 
@@ -105,11 +104,12 @@ export default function Reception() {
 
       <main className="max-w-2xl mx-auto mt-8 p-8 bg-white rounded-lg shadow-md">
         <form onSubmit={handleSubmit}>
+
           <div className="mb-4">
             <label className="block text-gray-700 font-semibold mb-2">Department *</label>
             <select
               value={formData.department_id}
-              onChange={(e) => setFormData({...formData, department_id: e.target.value, category_id: ''})}
+              onChange={e => setFormData({ ...formData, department_id: e.target.value, category_id: '' })}
               className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
               required
             >
@@ -125,111 +125,105 @@ export default function Reception() {
               <label className="block text-gray-700 font-semibold mb-2">Service Type</label>
               <select
                 value={formData.category_id}
-                onChange={(e) => setFormData({...formData, category_id: e.target.value})}
+                onChange={e => setFormData({ ...formData, category_id: e.target.value })}
                 className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
               >
                 <option value="">Select Service</option>
                 {categories.map(cat => (
-                  <option key={cat.category_id} value={cat.category_id}>{cat.name}</option>
+                  <option key={cat.category_id} value={cat.category_id}>
+                    {cat.name} ({cat.estimated_time_minutes} min)
+                  </option>
                 ))}
               </select>
             </div>
           )}
 
+          {/* Live wait estimate */}
+          {waitEstimate !== null && (
+            <div className="mb-5 p-4 bg-teal bg-opacity-10 border-l-4 border-teal rounded-lg">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-0.5">Estimated Wait</p>
+                  {waitEstimate.ahead === 0
+                    ? <p className="text-xl font-black text-teal">You're next — no wait!</p>
+                    : <>
+                        <p className="text-2xl font-black text-teal">~{waitEstimate.minutes} min</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {waitEstimate.ahead} {waitEstimate.ahead === 1 ? 'person' : 'people'} ahead &times; {waitEstimate.perService} min/service
+                        </p>
+                      </>
+                  }
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-0.5">Queue Position</p>
+                  <p className="text-2xl font-black text-navy">#{queuePosition}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="mb-4">
             <label className="block text-gray-700 font-semibold mb-2">Parent Name *</label>
-            <input
-              type="text"
-              value={formData.parent_name}
-              onChange={(e) => setFormData({...formData, parent_name: e.target.value})}
-              className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
-              required
-            />
+            <input type="text" value={formData.parent_name}
+              onChange={e => setFormData({ ...formData, parent_name: e.target.value })}
+              className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-navy" required />
           </div>
 
           <div className="mb-4">
             <label className="block text-gray-700 font-semibold mb-2">Student Name *</label>
-            <input
-              type="text"
-              value={formData.student_name}
-              onChange={(e) => setFormData({...formData, student_name: e.target.value})}
-              className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
-              required
-            />
+            <input type="text" value={formData.student_name}
+              onChange={e => setFormData({ ...formData, student_name: e.target.value })}
+              className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-navy" required />
           </div>
 
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
               <label className="block text-gray-700 font-semibold mb-2">Student ID</label>
-              <input
-                type="text"
-                value={formData.student_id}
-                onChange={(e) => setFormData({...formData, student_id: e.target.value})}
-                className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
-              />
+              <input type="text" value={formData.student_id}
+                onChange={e => setFormData({ ...formData, student_id: e.target.value })}
+                className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-navy" />
             </div>
             <div>
               <label className="block text-gray-700 font-semibold mb-2">Phone Number</label>
-              <input
-                type="tel"
-                value={formData.phone}
-                onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
-              />
+              <input type="tel" value={formData.phone}
+                onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-navy" />
             </div>
           </div>
 
           <div className="mb-4">
             <label className="block text-gray-700 font-semibold mb-2">Purpose of Visit</label>
-            <textarea
-              value={formData.purpose}
-              onChange={(e) => setFormData({...formData, purpose: e.target.value})}
-              className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
-              rows="3"
-            />
+            <textarea value={formData.purpose}
+              onChange={e => setFormData({ ...formData, purpose: e.target.value })}
+              className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-navy" rows="3" />
           </div>
 
           <div className="mb-6">
             <label className="block text-gray-700 font-semibold mb-2">Priority</label>
             <div className="flex gap-4">
               {['regular', 'urgent', 'elderly', 'vip'].map(priority => (
-                <label key={priority} className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name="priority"
-                    value={priority}
+                <label key={priority} className="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="priority" value={priority}
                     checked={formData.priority === priority}
-                    onChange={(e) => setFormData({...formData, priority: e.target.value})}
-                    className="w-4 h-4"
-                  />
+                    onChange={e => setFormData({ ...formData, priority: e.target.value })}
+                    className="w-4 h-4" />
                   <span className="capitalize">{priority}</span>
                 </label>
               ))}
             </div>
           </div>
 
-          {estimatedWait !== null && (
-            <div className="mb-6 p-4 bg-teal bg-opacity-10 border-l-4 border-teal rounded">
-              <p className="text-sm text-gray-600">Estimated Wait: <span className="font-bold text-lg">{estimatedWait} minutes</span></p>
-              <p className="text-sm text-gray-600">Queue Position: <span className="font-bold text-lg">{queuePosition}th</span></p>
-            </div>
-          )}
-
           <div className="flex gap-4">
-            <button
-              type="submit"
-              className="flex-1 bg-teal text-white py-4 rounded-lg hover:bg-opacity-90 font-bold text-lg"
-            >
+            <button type="submit"
+              className="flex-1 bg-teal text-white py-4 rounded-lg hover:bg-opacity-90 font-bold text-lg">
               CREATE & PRINT TICKET
             </button>
-            <button
-              type="button"
-              onClick={resetForm}
-              className="px-8 bg-gray-300 text-gray-700 py-4 rounded-lg hover:bg-gray-400 font-semibold"
-            >
+            <button type="button" onClick={resetForm}
+              className="px-8 bg-gray-300 text-gray-700 py-4 rounded-lg hover:bg-gray-400 font-semibold">
               CANCEL
             </button>
           </div>
+
         </form>
       </main>
     </div>

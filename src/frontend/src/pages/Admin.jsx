@@ -26,10 +26,18 @@ export default function Admin() {
           <NavLink to="/admin/announcements" className={({ isActive }) =>
             `flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-teal text-white' : 'text-gray-300 hover:bg-white hover:bg-opacity-10'}`
           }>Announcements</NavLink>
+          <NavLink to="/admin/queue-control" className={({ isActive }) =>
+            `flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-teal text-white' : 'text-gray-300 hover:bg-white hover:bg-opacity-10'}`
+          }>Queue Control</NavLink>
           {user?.role === 'super_admin' && (
             <NavLink to="/admin/settings" className={({ isActive }) =>
               `flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-teal text-white' : 'text-gray-300 hover:bg-white hover:bg-opacity-10'}`
             }>Settings</NavLink>
+          )}
+          {user?.role === 'super_admin' && (
+            <NavLink to="/admin/audit-log" className={({ isActive }) =>
+              `flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-teal text-white' : 'text-gray-300 hover:bg-white hover:bg-opacity-10'}`
+            }>Audit Log</NavLink>
           )}
         </nav>
         <div className="p-4 border-t border-white border-opacity-20 space-y-2">

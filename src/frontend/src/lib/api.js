@@ -74,10 +74,21 @@ export const adminAPI = {
   getUsers: () => api.get('/admin/users'),
   createUser: (data) => api.post('/admin/users', data),
   updateUser: (id, data) => api.put(`/admin/users/${id}`, data),
+  getCategories: (deptId) => api.get(`/admin/departments/${deptId}/categories`),
+  createCategory: (deptId, data) => api.post(`/admin/departments/${deptId}/categories`, data),
+  updateCategory: (deptId, catId, data) => api.put(`/admin/departments/${deptId}/categories/${catId}`, data),
+  deleteCategory: (deptId, catId) => api.delete(`/admin/departments/${deptId}/categories/${catId}`),
   getAnnouncements: () => api.get('/admin/announcements'),
   createAnnouncement: (data) => api.post('/admin/announcements', data),
   updateAnnouncement: (id, data) => api.put(`/admin/announcements/${id}`, data),
-  deleteAnnouncement: (id) => api.delete(`/admin/announcements/${id}`)
+  deleteAnnouncement: (id) => api.delete(`/admin/announcements/${id}`),
+  getAuditLogs: (params) => api.get('/admin/audit-logs', { params })
+};
+
+export const reportsAPI = {
+  getDaily:         (date)   => api.get('/reports/daily', { params: { date } }),
+  getServiceTypes:  (params) => api.get('/reports/service-types', { params }),
+  getCategoryStats: ()       => api.get('/reports/category-stats'),
 };
 
 export default api;

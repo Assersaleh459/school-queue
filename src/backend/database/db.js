@@ -38,6 +38,8 @@ function initDatabase() {
   // Migrations — safe to run on every startup
   try { db.prepare("ALTER TABLE announcements ADD COLUMN speak_language TEXT DEFAULT 'en'").run(); } catch {}
   try { db.prepare("ALTER TABLE users ADD COLUMN allowed_pages TEXT DEFAULT NULL").run(); } catch {}
+  try { db.prepare("ALTER TABLE departments ADD COLUMN name_ar TEXT DEFAULT NULL").run(); } catch {}
+  try { db.prepare("ALTER TABLE departments ADD COLUMN room_number TEXT DEFAULT NULL").run(); } catch {}
 
   console.log('✓ Database initialized');
 }

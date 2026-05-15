@@ -55,11 +55,19 @@ async function playTTS(text, lang, signal) {
   });
 }
 
-function applyVars(template, number, department) {
+const AR_DIGITS = '٠١٢٣٤٥٦٧٨٩';
+function toArabicNumerals(str) {
+  return String(str).replace(/[0-9]/g, d => AR_DIGITS[d]);
+}
+
+function applyVars(template, number, department, lang, departmentAr, room) {
+  const dept   = (lang === 'ar' && departmentAr) ? departmentAr : department;
+  const numStr = lang === 'ar' ? toArabicNumerals(number) : String(number);
   return template
-    .replace(/{ticket}/g,     String(number))
-    .replace(/{number}/g,     String(number))
-    .replace(/{department}/g, department);
+    .replace(/{ticket}/g,     numStr)
+    .replace(/{number}/g,     numStr)
+    .replace(/{department}/g, dept)
+    .replace(/{room}/g,       room || '');
 }
 
 // ── Defaults ─────────────────────────────────────────────────────────────────
@@ -102,7 +110,7 @@ export default function PublicDisplay() {
   }, []);
 
   // speak() cancels any in-flight audio, then queues and plays new announcement
-  const speak = useCallback((ticketNumber, deptName, recalled) => {
+  const speak = useCallback((ticketNumber, deptName, deptNameAr, recalled, roomNumber) => {
     if (!s.current.audioEnabled) return;
 
     abortCtrl.current?.abort();
@@ -119,13 +127,13 @@ export default function PublicDisplay() {
       const tmpl = recalled
         ? (lang === 'ar' ? s.current.recallAr : s.current.recallEn)
         : (lang === 'ar' ? s.current.callAr   : s.current.callEn);
-      speakQueue.current.push({ text: applyVars(tmpl, num, deptName), lang });
+      speakQueue.current.push({ text: applyVars(tmpl, num, deptName, lang, deptNameAr, roomNumber), lang });
     }
     drainQueue(ctrl.signal);
   }, [drainQueue]);
 
-  const onCalled   = useCallback((data) => { fetchDisplayData(); speak(data.ticket_number, data.department_name, false); }, [speak]);
-  const onRecalled = useCallback((data) => { speak(data.ticket_number, data.department_name, !!data.is_final); }, [speak]);
+  const onCalled   = useCallback((data) => { fetchDisplayData(); speak(data.ticket_number, data.department_name, data.department_name_ar, false, data.department_room); }, [speak]);
+  const onRecalled = useCallback((data) => { speak(data.ticket_number, data.department_name, data.department_name_ar, !!data.is_final, data.department_room); }, [speak]);
 
   useMonitorSocket(onCalled, onRecalled);
 
@@ -176,8 +184,9 @@ export default function PublicDisplay() {
   }
 
   const tickerText = announcements.map(a => {
-    if (announceLang === 'ar'   && a.message_text_ar) return a.message_text_ar;
-    if (announceLang === 'both' && a.message_text_ar) return `${a.message_text}   ${a.message_text_ar}`;
+    const lang = a.speak_language || 'en';
+    if (lang === 'ar'   && a.message_text_ar) return a.message_text_ar;
+    if (lang === 'both' && a.message_text_ar) return `${a.message_text}   •   ${a.message_text_ar}`;
     return a.message_text;
   }).join('   •   ');
 

@@ -43,7 +43,11 @@ export default function Users() {
 
   const openEdit = (u) => {
     setEditing(u);
-    setForm({ username: u.username, password: '', full_name: u.full_name, role: u.role, department_id: u.department_id || '', is_active: !!u.is_active, allowed_pages: u.allowed_pages || null });
+    let pages = null;
+    if (u.allowed_pages) {
+      try { pages = typeof u.allowed_pages === 'string' ? JSON.parse(u.allowed_pages) : u.allowed_pages; } catch {}
+    }
+    setForm({ username: u.username, password: '', full_name: u.full_name, role: u.role, department_id: u.department_id || '', is_active: !!u.is_active, allowed_pages: pages });
     setError('');
     setShowForm(true);
   };
@@ -80,7 +84,14 @@ export default function Users() {
   const toggleActive = async (u) => {
     if (u.role === 'super_admin') return;
     try {
-      await adminAPI.updateUser(u.user_id, { ...u, is_active: u.is_active ? 0 : 1, password: undefined });
+      let pages = null;
+      if (u.allowed_pages) {
+        try { pages = typeof u.allowed_pages === 'string' ? JSON.parse(u.allowed_pages) : u.allowed_pages; } catch {}
+      }
+      await adminAPI.updateUser(u.user_id, {
+        full_name: u.full_name, role: u.role, department_id: u.department_id,
+        is_active: u.is_active ? 0 : 1, allowed_pages: pages
+      });
       loadUsers();
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to update user');

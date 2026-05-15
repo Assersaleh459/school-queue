@@ -4,7 +4,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        navy: '#19224A',
+        navy: 'rgb(var(--color-navy) / <alpha-value>)',
         teal: '#5FAEB6',
         'light-teal': '#7CC6CC',
         'dark-navy': '#223B73'
