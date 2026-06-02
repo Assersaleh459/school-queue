@@ -90,6 +90,13 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_tickets_dept_status ON tickets(department_id, status);
-CREATE INDEX IF NOT EXISTS idx_tickets_created ON tickets(created_at);
-CREATE INDEX IF NOT EXISTS idx_tickets_number ON tickets(ticket_number);
+CREATE INDEX IF NOT EXISTS idx_tickets_dept_status   ON tickets(department_id, status);
+CREATE INDEX IF NOT EXISTS idx_tickets_created        ON tickets(created_at);
+CREATE INDEX IF NOT EXISTS idx_tickets_number         ON tickets(ticket_number);
+CREATE INDEX IF NOT EXISTS idx_tickets_completed_at   ON tickets(completed_at);
+CREATE INDEX IF NOT EXISTS idx_tickets_served_by      ON tickets(served_by_user_id);
+CREATE INDEX IF NOT EXISTS idx_tickets_category       ON tickets(category_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logged_at        ON audit_logs(logged_at);
+CREATE INDEX IF NOT EXISTS idx_audit_user             ON audit_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_users_dept             ON users(department_id);
+CREATE INDEX IF NOT EXISTS idx_users_active           ON users(is_active);

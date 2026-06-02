@@ -7,7 +7,9 @@ const insert = db.prepare(
 function log(userId, action, entityType = null, entityId = null, details = null) {
   try {
     insert.run(userId ?? null, action, entityType, entityId, details ? JSON.stringify(details) : null);
-  } catch {}
+  } catch (err) {
+    console.error('[AUDIT] Failed to write audit log:', action, err.message);
+  }
 }
 
 module.exports = { log };

@@ -30,7 +30,7 @@ exports.login = async (req, res) => {
         department_id: user.department_id
       },
       process.env.JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: '8h' }
     );
 
     res.json({
@@ -66,8 +66,8 @@ exports.changePassword = async (req, res) => {
   if (!current_password || !new_password) {
     return res.status(400).json({ error: 'Current and new password are required' });
   }
-  if (new_password.length < 6) {
-    return res.status(400).json({ error: 'New password must be at least 6 characters' });
+  if (new_password.length < 8) {
+    return res.status(400).json({ error: 'New password must be at least 8 characters' });
   }
 
   try {

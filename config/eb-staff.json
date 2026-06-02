@@ -1,5 +1,4 @@
-{
-  "appId": "com.vyrasystems.schoolqueue.staff",
+{"appId": "com.vyrasystems.schoolqueue.staff",
   "productName": "SchoolQ Staff",
   "buildDependenciesFromSource": true,
   "directories": {
@@ -7,7 +6,7 @@
     "buildResources": "electron"
   },
   "extraMetadata": {
-    "version": "1.5.15"
+    "version": "1.5.25"
   },
   "extraResources": [
     {
@@ -33,3 +32,4 @@
     "shortcutName": "SchoolQ Staff"
   }
 }
+

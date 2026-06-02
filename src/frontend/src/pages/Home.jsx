@@ -43,6 +43,15 @@ const TILES = [
     icon: '📊'
   },
   {
+    label: 'All Queues',
+    description: 'View all departments at once',
+    path: '/all-queues',
+    page: 'all_queues',
+    color: '#7c3aed',
+    roles: ['super_admin', 'admin'],
+    icon: '🗂️'
+  },
+  {
     label: 'Display Monitor',
     description: 'Public queue display screen',
     path: '/display',

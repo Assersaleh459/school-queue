@@ -3,6 +3,7 @@ const Database = require('better-sqlite3');
 const bcrypt = require('bcrypt');
 const fs = require('fs');
 const path = require('path');
+const { runMigrations } = require('./migrations/runner');
 
 // In Electron production, DB_PATH is set to app.getPath('userData') to avoid
 // writing inside read-only Program Files.
@@ -35,12 +36,7 @@ function initDatabase() {
     console.log('✓ Database seeded');
   }
 
-  // Migrations — safe to run on every startup
-  try { db.prepare("ALTER TABLE announcements ADD COLUMN speak_language TEXT DEFAULT 'en'").run(); } catch {}
-  try { db.prepare("ALTER TABLE users ADD COLUMN allowed_pages TEXT DEFAULT NULL").run(); } catch {}
-  try { db.prepare("ALTER TABLE departments ADD COLUMN name_ar TEXT DEFAULT NULL").run(); } catch {}
-  try { db.prepare("ALTER TABLE departments ADD COLUMN room_number TEXT DEFAULT NULL").run(); } catch {}
-
+  runMigrations(db);
   console.log('✓ Database initialized');
 }
 

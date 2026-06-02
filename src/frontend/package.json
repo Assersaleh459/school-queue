@@ -1,7 +1,6 @@
-{
-  "name": "frontend",
+{"name": "frontend",
   "private": true,
-  "version": "1.5.15",
+  "version": "1.5.25",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -37,3 +36,4 @@
     "vite": "^8.0.10"
   }
 }
+

@@ -3,10 +3,17 @@ import { io } from 'socket.io-client';
 
 let socket;
 
-export function useSocket(departmentId, onQueueUpdate) {
+function forceLogoutCleanup() {
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  window.location.href = '/login';
+}
+
+export function useSocket(departmentId, onQueueUpdate, onSettingsUpdated) {
   useEffect(() => {
     socket = io(window.location.origin, {
-      transports: ['websocket', 'polling']
+      transports: ['websocket', 'polling'],
+      auth: { token: localStorage.getItem('token') }
     });
 
     socket.on('connect', () => {
@@ -21,6 +28,10 @@ export function useSocket(departmentId, onQueueUpdate) {
       onQueueUpdate();
     });
 
+    if (onSettingsUpdated) socket.on('settings_updated', onSettingsUpdated);
+
+    socket.on('force_logout', forceLogoutCleanup);
+
     socket.on('disconnect', () => {
       console.log('Socket disconnected');
     });
@@ -32,7 +43,7 @@ export function useSocket(departmentId, onQueueUpdate) {
     return () => {
       socket.disconnect();
     };
-  }, [departmentId, onQueueUpdate]);
+  }, [departmentId, onQueueUpdate, onSettingsUpdated]);
 
   return socket;
 }
@@ -41,6 +52,7 @@ export function useMonitorSocket(onTicketCalled, onTicketRecalled) {
   useEffect(() => {
     socket = io(window.location.origin, {
       transports: ['websocket', 'polling']
+      // no auth — public display screen
     });
 
     socket.on('connect', () => {

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { departmentAPI, ticketAPI, settingsAPI } from '../lib/api';
 import useAuthStore from '../store/useAuthStore';
 import TicketReceipt from '../components/TicketReceipt';
+import { toast } from '../store/useToastStore';
 
 export default function Reception() {
   const [departments, setDepartments]     = useState([]);
@@ -22,6 +23,7 @@ export default function Reception() {
   const [waitEstimate, setWaitEstimate]   = useState(null); // { minutes, ahead, perService }
   const [createdTicket, setCreatedTicket] = useState(null);
   const [schoolName, setSchoolName]       = useState('Al-Noor School');
+  const [ticketSettings, setTicketSettings] = useState({});
 
   const user   = useAuthStore(state => state.user);
   const logout = useAuthStore(state => state.logout);
@@ -30,7 +32,10 @@ export default function Reception() {
   useEffect(() => {
     departmentAPI.getAll().then(r => setDepartments(r.data)).catch(() => {});
     settingsAPI.getPublic()
-      .then(res => { if (res.data.school_name) setSchoolName(res.data.school_name); })
+      .then(res => {
+        if (res.data.school_name) setSchoolName(res.data.school_name);
+        setTicketSettings(res.data);
+      })
       .catch(() => {});
   }, []);
 
@@ -70,10 +75,14 @@ export default function Reception() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await ticketAPI.create(formData);
-      setCreatedTicket(res.data.ticket);
+      const ticketRes = await ticketAPI.create(formData);
+      settingsAPI.getPublic().then(res => {
+        setTicketSettings(res.data);
+        if (res.data.school_name) setSchoolName(res.data.school_name);
+      }).catch(() => {});
+      setCreatedTicket(ticketRes.data.ticket);
     } catch (error) {
-      alert('Failed to create ticket: ' + error.response?.data?.error);
+      toast.error('Failed to create ticket: ' + (error.response?.data?.error || error.message));
     }
   };
 
@@ -86,7 +95,7 @@ export default function Reception() {
   };
 
   if (createdTicket) {
-    return <TicketReceipt ticket={createdTicket} schoolName={schoolName} onClose={resetForm} />;
+    return <TicketReceipt ticket={createdTicket} schoolName={schoolName} ticketSettings={ticketSettings} onClose={resetForm} />;
   }
 
   return (

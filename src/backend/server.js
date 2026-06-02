@@ -35,13 +35,23 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '5mb' })); // allow base64 logo uploads
 
 const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 15 * 60 * 1000,
   max: 20,
   message: { error: 'Too many login attempts. Try again in 15 minutes.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
+// Applied to all POST/PUT/DELETE (write operations)
+const mutationLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 60,
+  message: { error: 'Too many requests. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const errorHandler = require('./middleware/errorHandler');
 const ttsRoute   = require('./routes/tts');
 const authRoutes = require('./routes/auth');
 const ticketRoutes = require('./routes/tickets');
@@ -63,13 +73,13 @@ app.use((req, res, next) => {
 
 app.use('/api/tts', ttsRoute);
 app.use('/api/auth', authRoutes);
-app.use('/api/tickets', ticketRoutes);
+app.use('/api/tickets', mutationLimiter, ticketRoutes);
 app.use('/api/departments', departmentRoutes);
-app.use('/api/queue', queueRoutes);
+app.use('/api/queue', mutationLimiter, queueRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/display', displayRoutes);
 app.use('/api/announcements', announcementRoutes);
-app.use('/api/admin', adminRoutes);
+app.use('/api/admin', mutationLimiter, adminRoutes);
 app.use('/api/reports', reportRoutes);
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
@@ -81,7 +91,9 @@ app.get('/api/settings/public', (req, res) => {
     'school_name', 'primary_color', 'working_hours_start', 'working_hours_end',
     'announcement_language', 'audio_enabled',
     'call_template_en', 'call_template_ar', 'recall_template_en', 'recall_template_ar',
-    'no_show_after_calls', 'school_logo',
+    'no_show_after_calls', 'max_wait_alert_minutes', 'school_logo',
+    'ticket_paper', 'ticket_footer', 'ticket_number_size',
+    'ticket_show_parent', 'ticket_show_student', 'ticket_show_time', 'ticket_show_wait',
   ];
   const result = {};
   keys.forEach(k => {
@@ -99,6 +111,8 @@ if (process.env.NODE_ENV === 'production') {
     res.sendFile(path.join(frontendDist, 'index.html'));
   });
 }
+
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {

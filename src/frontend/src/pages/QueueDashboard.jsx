@@ -4,6 +4,17 @@ import { departmentAPI, queueAPI, settingsAPI } from '../lib/api';
 import useAuthStore from '../store/useAuthStore';
 import { useSocket } from '../lib/useSocket';
 import ConnectionStatus from '../components/ConnectionStatus';
+import { toast } from '../store/useToastStore';
+
+function QueueSkeleton() {
+  return (
+    <div className="animate-pulse space-y-3">
+      {[1, 2, 3].map(i => (
+        <div key={i} className="h-16 bg-gray-200 rounded-lg" />
+      ))}
+    </div>
+  );
+}
 
 export default function QueueDashboard() {
   const [queue, setQueue]               = useState([]);
@@ -11,6 +22,7 @@ export default function QueueDashboard() {
   const [currentTicket, setCurrentTicket] = useState(null);
   const [stats, setStats]               = useState({ waiting_count: 0, serving_count: 0, served_today: 0 });
   const [notes, setNotes]               = useState('');
+  const [loading, setLoading]           = useState(true);
 
   // Modals
   const [noShowAfterCalls, setNoShowAfterCalls] = useState(3);
@@ -22,6 +34,9 @@ export default function QueueDashboard() {
   const [transferDept, setTransferDept] = useState('');
   const [transferReason, setTransferReason] = useState('');
   const [noShowModal, setNoShowModal]   = useState(false);
+  const [noShowReason, setNoShowReason] = useState('');
+  const [cancelModal, setCancelModal]   = useState(null); // ticket object
+  const [cancelReason, setCancelReason] = useState('');
 
   const user         = useAuthStore(state => state.user);
   const logout       = useAuthStore(state => state.logout);
@@ -39,6 +54,8 @@ export default function QueueDashboard() {
       setStats(statsRes.data);
     } catch (err) {
       console.error('Failed to fetch queue:', err);
+    } finally {
+      setLoading(false);
     }
   }, [departmentId]);
 
@@ -56,7 +73,13 @@ export default function QueueDashboard() {
       .catch(() => {});
   }, [departmentId, fetchQueue]);
 
-  useSocket(departmentId, fetchQueue);
+  const handleSettingsUpdated = useCallback(() => {
+    settingsAPI.getPublic()
+      .then(res => { if (res.data.no_show_after_calls) setNoShowAfterCalls(parseInt(res.data.no_show_after_calls)); })
+      .catch(() => {});
+  }, []);
+
+  useSocket(departmentId, fetchQueue, handleSettingsUpdated);
 
   // ── Actions ─────────────────────────────────────────────────────────────────
 
@@ -66,7 +89,7 @@ export default function QueueDashboard() {
       setCurrentTicket(res.data.ticket);
       fetchQueue();
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to call next ticket');
+      toast.error(err.response?.data?.error || 'Failed to call next ticket');
     }
   };
 
@@ -78,7 +101,7 @@ export default function QueueDashboard() {
       setNotes('');
       fetchQueue();
     } catch {
-      alert('Failed to complete ticket');
+      toast.error('Failed to complete ticket');
     }
   };
 
@@ -88,7 +111,7 @@ export default function QueueDashboard() {
       const res = await queueAPI.recall(currentTicket.ticket_id);
       setCurrentTicket(res.data.ticket);
     } catch {
-      alert('Failed to recall ticket');
+      toast.error('Failed to recall ticket');
     }
   };
 
@@ -101,18 +124,33 @@ export default function QueueDashboard() {
       setSkipReason('');
       fetchQueue();
     } catch {
-      alert('Failed to skip ticket');
+      toast.error('Failed to skip ticket');
     }
   };
 
   const confirmNoShow = async () => {
     try {
-      await queueAPI.noShow(currentTicket.ticket_id);
+      await queueAPI.noShow(currentTicket.ticket_id, noShowReason.trim() || undefined);
       setCurrentTicket(null);
       setNoShowModal(false);
+      setNoShowReason('');
       fetchQueue();
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to mark no-show');
+      toast.error(err.response?.data?.error || 'Failed to mark no-show');
+    }
+  };
+
+  const confirmCancel = async () => {
+    if (!cancelReason.trim()) return;
+    try {
+      await queueAPI.cancel(cancelModal.ticket_id, cancelReason.trim());
+      if (currentTicket?.ticket_id === cancelModal.ticket_id) setCurrentTicket(null);
+      setCancelModal(null);
+      setCancelReason('');
+      fetchQueue();
+      toast.success(`Ticket ${cancelModal.ticket_number} cancelled`);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to cancel ticket');
     }
   };
 
@@ -126,7 +164,7 @@ export default function QueueDashboard() {
       setTransferReason('');
       fetchQueue();
     } catch {
-      alert('Failed to transfer ticket');
+      toast.error('Failed to transfer ticket');
     }
   };
 
@@ -183,7 +221,13 @@ export default function QueueDashboard() {
           <div className="bg-white border-4 border-green-500 rounded-lg p-6 mb-8">
             <h2 className="text-2xl font-bold mb-2">CURRENTLY SERVING: {currentTicket.ticket_number}</h2>
             <p className="text-lg mb-1">Parent: <strong>{currentTicket.parent_name}</strong> | Student: <strong>{currentTicket.student_name}</strong></p>
-            <p className="text-base text-gray-500 mb-4">Service: {currentTicket.category_name || 'General'}</p>
+            <p className="text-base text-gray-500 mb-1">Service: {currentTicket.category_name || 'General'}</p>
+            {currentTicket.purpose && (
+              <p className="text-sm text-gray-700 mb-1"><span className="font-semibold">Purpose:</span> {currentTicket.purpose}</p>
+            )}
+            {currentTicket.notes && (
+              <p className="text-sm text-blue-700 bg-blue-50 rounded px-2 py-1 mb-3"><span className="font-semibold">Note:</span> {currentTicket.notes}</p>
+            )}
 
             <div className="flex flex-wrap gap-2 mb-4">
               <button onClick={handleComplete}
@@ -203,12 +247,19 @@ export default function QueueDashboard() {
                 SKIP
               </button>
               <button
-                onClick={() => setNoShowModal(true)}
+                onClick={() => { setNoShowModal(true); setNoShowReason(''); }}
                 disabled={currentTicket.call_count < noShowAfterCalls}
                 title={currentTicket.call_count < noShowAfterCalls ? `Must call ${noShowAfterCalls}× before no-show (called ${currentTicket.call_count}×)` : 'Mark as no-show'}
                 className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 NO-SHOW {currentTicket.call_count < noShowAfterCalls && `(${currentTicket.call_count}/${noShowAfterCalls})`}
+              </button>
+              <button
+                onClick={() => { setCancelModal(currentTicket); setCancelReason(''); }}
+                className="px-6 py-3 bg-gray-700 text-white rounded-lg hover:bg-gray-800 font-semibold"
+                title="Customer left — cancel this ticket permanently"
+              >
+                CANCEL / LEFT
               </button>
             </div>
 
@@ -246,26 +297,32 @@ export default function QueueDashboard() {
           <div className="bg-navy text-white py-3 px-6">
             <h2 className="text-xl font-bold">Waiting Queue</h2>
           </div>
-          <table className="w-full">
+          {loading ? (
+            <div className="p-6"><QueueSkeleton /></div>
+          ) : null}
+          <table className={`w-full ${loading ? 'hidden' : ''}`}>
             <thead className="bg-gray-100">
               <tr>
                 <th className="px-4 py-3 text-left">Ticket #</th>
                 <th className="px-4 py-3 text-left">Parent</th>
                 <th className="px-4 py-3 text-left">Student</th>
                 <th className="px-4 py-3 text-left">Service</th>
+                <th className="px-4 py-3 text-left">Purpose</th>
                 <th className="px-4 py-3 text-left">Wait Time</th>
                 <th className="px-4 py-3 text-left">Priority</th>
+                <th className="px-4 py-3 text-left"></th>
               </tr>
             </thead>
             <tbody>
               {queue.length === 0 ? (
-                <tr><td colSpan="6" className="px-4 py-8 text-center text-gray-500">No waiting tickets</td></tr>
+                <tr><td colSpan="8" className="px-4 py-8 text-center text-gray-500">No waiting tickets</td></tr>
               ) : queue.map(ticket => (
                 <tr key={ticket.ticket_id} className="border-b hover:bg-gray-50">
                   <td className="px-4 py-3 font-semibold">{ticket.ticket_number}</td>
                   <td className="px-4 py-3">{ticket.parent_name}</td>
                   <td className="px-4 py-3">{ticket.student_name}</td>
                   <td className="px-4 py-3">{ticket.category_name || '-'}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate" title={ticket.purpose || ''}>{ticket.purpose || '-'}</td>
                   <td className="px-4 py-3">{calculateWaitTime(ticket.created_at)}</td>
                   <td className="px-4 py-3">
                     {ticket.priority !== 'regular' && (
@@ -273,6 +330,15 @@ export default function QueueDashboard() {
                         {ticket.priority}
                       </span>
                     )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => { setCancelModal(ticket); setCancelReason(''); }}
+                      className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded hover:bg-red-100 hover:text-red-700 font-semibold"
+                      title="Customer left — cancel this ticket"
+                    >
+                      Cancel
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -353,10 +419,20 @@ export default function QueueDashboard() {
       {/* ── No-Show Modal ── */}
       {noShowModal && (
         <Modal title="Mark as No-Show" onClose={() => setNoShowModal(false)}>
-          <p className="text-gray-600 mb-6">
+          <p className="text-gray-600 mb-4">
             Mark ticket <strong>{currentTicket?.ticket_number}</strong> as no-show?
-            This ticket has been called <strong>{currentTicket?.call_count} times</strong>.
+            Called <strong>{currentTicket?.call_count} times</strong>.
           </p>
+          <label className="block text-sm font-semibold text-gray-700 mb-1">Reason (optional)</label>
+          <input
+            type="text"
+            autoFocus
+            value={noShowReason}
+            onChange={e => setNoShowReason(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && confirmNoShow()}
+            placeholder="e.g. Did not respond after final call"
+            className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400 mb-4"
+          />
           <div className="flex gap-3">
             <button onClick={confirmNoShow}
               className="flex-1 bg-red-600 text-white py-2 rounded-lg font-semibold hover:bg-red-700">
@@ -365,6 +441,36 @@ export default function QueueDashboard() {
             <button onClick={() => setNoShowModal(false)}
               className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg font-semibold hover:bg-gray-300">
               Cancel
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Cancel Modal ── */}
+      {cancelModal && (
+        <Modal title="Cancel Ticket — Customer Left" onClose={() => setCancelModal(null)}>
+          <p className="text-gray-600 mb-4">
+            Permanently cancel ticket <strong>{cancelModal.ticket_number}</strong> for <strong>{cancelModal.parent_name}</strong>.
+            <br /><span className="text-xs text-gray-400 mt-1 block">Use this when the customer has left without being served.</span>
+          </p>
+          <label className="block text-sm font-semibold text-gray-700 mb-1">Reason *</label>
+          <input
+            autoFocus
+            type="text"
+            value={cancelReason}
+            onChange={e => setCancelReason(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && confirmCancel()}
+            placeholder="e.g. Parent left the premises"
+            className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400 mb-4"
+          />
+          <div className="flex gap-3">
+            <button onClick={confirmCancel} disabled={!cancelReason.trim()}
+              className="flex-1 bg-gray-700 text-white py-2 rounded-lg font-semibold hover:bg-gray-800 disabled:opacity-40">
+              Cancel Ticket
+            </button>
+            <button onClick={() => setCancelModal(null)}
+              className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg font-semibold hover:bg-gray-300">
+              Keep in Queue
             </button>
           </div>
         </Modal>

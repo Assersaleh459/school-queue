@@ -98,4 +98,118 @@ router.get('/category-stats', (req, res) => {
   }
 });
 
+router.get('/transfers', (req, res) => {
+  const { from, to, dept_id } = req.query;
+  const fromDate = from || new Date().toISOString().split('T')[0];
+  const toDate   = to   || fromDate;
+  try {
+    let query = `
+      SELECT
+        tr.transfer_id,
+        tr.transferred_at,
+        tr.reason,
+        t.ticket_number,
+        t.parent_name,
+        t.student_name,
+        d_from.name AS from_department,
+        d_to.name   AS to_department,
+        u.full_name AS transferred_by
+      FROM transfers tr
+      JOIN tickets t      ON tr.original_ticket_id = t.ticket_id
+      JOIN departments d_from ON tr.from_dept_id   = d_from.department_id
+      JOIN departments d_to   ON tr.to_dept_id     = d_to.department_id
+      LEFT JOIN users u   ON tr.transferred_by     = u.user_id
+      WHERE DATE(tr.transferred_at) BETWEEN ? AND ?
+    `;
+    const params = [fromDate, toDate];
+    if (dept_id) { query += ' AND (tr.from_dept_id = ? OR tr.to_dept_id = ?)'; params.push(dept_id, dept_id); }
+    query += ' ORDER BY tr.transferred_at DESC';
+    res.json(db.prepare(query).all(...params));
+  } catch (error) {
+    console.error('Transfers report error:', error);
+    res.status(500).json({ error: 'Failed to generate transfers report' });
+  }
+});
+
+router.get('/ticket-log', (req, res) => {
+  const { from, to, dept_id, status, search } = req.query;
+  const fromDate = from || new Date().toISOString().split('T')[0];
+  const toDate   = to   || fromDate;
+  try {
+    let query = `
+      SELECT
+        t.ticket_id,
+        t.ticket_number,
+        t.parent_name,
+        t.student_name,
+        t.student_id,
+        t.phone,
+        t.purpose,
+        t.priority,
+        t.status,
+        t.notes,
+        t.created_at,
+        t.called_at,
+        t.completed_at,
+        t.service_duration,
+        t.call_count,
+        d.name  AS department,
+        sc.name AS service_type,
+        u.full_name AS served_by,
+        ROUND(
+          CASE
+            WHEN t.called_at IS NOT NULL
+              THEN (julianday(t.called_at) - julianday(t.created_at)) * 1440
+            WHEN t.status = 'waiting'
+              THEN (julianday('now') - julianday(t.created_at)) * 1440
+            ELSE NULL
+          END, 1
+        ) AS wait_minutes
+      FROM tickets t
+      JOIN departments d ON t.department_id = d.department_id
+      LEFT JOIN service_categories sc ON t.category_id = sc.category_id
+      LEFT JOIN users u ON t.served_by_user_id = u.user_id
+      WHERE DATE(t.created_at) BETWEEN ? AND ?
+    `;
+    const params = [fromDate, toDate];
+    if (dept_id) { query += ' AND t.department_id = ?'; params.push(dept_id); }
+    if (status && status !== 'all') { query += ' AND t.status = ?'; params.push(status); }
+    if (search) {
+      query += ' AND (t.ticket_number LIKE ? OR t.parent_name LIKE ? OR t.student_name LIKE ?)';
+      const like = `%${search}%`;
+      params.push(like, like, like);
+    }
+    query += ' ORDER BY t.created_at DESC LIMIT 1000';
+    res.json(db.prepare(query).all(...params));
+  } catch (error) {
+    console.error('Ticket log error:', error);
+    res.status(500).json({ error: 'Failed to generate ticket log' });
+  }
+});
+
+router.get('/purposes', (req, res) => {
+  const { from, to, dept_id } = req.query;
+  const fromDate = from || new Date().toISOString().split('T')[0];
+  const toDate   = to   || fromDate;
+  try {
+    let query = `
+      SELECT
+        COALESCE(NULLIF(TRIM(t.purpose), ''), '(not specified)') AS purpose,
+        d.name AS department,
+        COUNT(*) AS total,
+        SUM(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) AS served
+      FROM tickets t
+      JOIN departments d ON t.department_id = d.department_id
+      WHERE DATE(t.created_at) BETWEEN ? AND ?
+    `;
+    const params = [fromDate, toDate];
+    if (dept_id) { query += ' AND t.department_id = ?'; params.push(dept_id); }
+    query += ' GROUP BY purpose, d.department_id ORDER BY total DESC';
+    res.json(db.prepare(query).all(...params));
+  } catch (error) {
+    console.error('Purposes report error:', error);
+    res.status(500).json({ error: 'Failed to generate purposes report' });
+  }
+});
+
 module.exports = router;

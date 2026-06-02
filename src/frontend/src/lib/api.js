@@ -48,14 +48,16 @@ export const departmentAPI = {
 
 export const queueAPI = {
   getDisplayData: () => api.get('/queue/display'),
+  getAll: () => api.get('/queue/all'),
   getCurrent: (deptId) => api.get(`/queue/departments/${deptId}/current`),
   callNext: (deptId, staffId) => api.post(`/queue/departments/${deptId}/call-next`, { staff_id: staffId }),
   complete: (ticketId, notes) => api.put(`/queue/tickets/${ticketId}/complete`, { notes }),
   recall: (ticketId) => api.put(`/queue/tickets/${ticketId}/recall`),
   skip: (ticketId, reason) => api.put(`/queue/tickets/${ticketId}/skip`, { reason }),
-  noShow: (ticketId) => api.put(`/queue/tickets/${ticketId}/no-show`),
+  noShow: (ticketId, reason) => api.put(`/queue/tickets/${ticketId}/no-show`, { reason }),
   transfer: (ticketId, to_dept_id, reason, staff_id) =>
-    api.post(`/queue/tickets/${ticketId}/transfer`, { to_dept_id, reason, staff_id })
+    api.post(`/queue/tickets/${ticketId}/transfer`, { to_dept_id, reason, staff_id }),
+  cancel: (ticketId, reason) => api.put(`/queue/tickets/${ticketId}/cancel`, { reason })
 };
 
 export const userAPI = {
@@ -74,6 +76,7 @@ export const adminAPI = {
   getUsers: () => api.get('/admin/users'),
   createUser: (data) => api.post('/admin/users', data),
   updateUser: (id, data) => api.put(`/admin/users/${id}`, data),
+  deleteUser: (id) => api.delete(`/admin/users/${id}`),
   getCategories: (deptId) => api.get(`/admin/departments/${deptId}/categories`),
   createCategory: (deptId, data) => api.post(`/admin/departments/${deptId}/categories`, data),
   updateCategory: (deptId, catId, data) => api.put(`/admin/departments/${deptId}/categories/${catId}`, data),
@@ -82,13 +85,17 @@ export const adminAPI = {
   createAnnouncement: (data) => api.post('/admin/announcements', data),
   updateAnnouncement: (id, data) => api.put(`/admin/announcements/${id}`, data),
   deleteAnnouncement: (id) => api.delete(`/admin/announcements/${id}`),
-  getAuditLogs: (params) => api.get('/admin/audit-logs', { params })
+  getAuditLogs: (params) => api.get('/admin/audit-logs', { params }),
+  searchTicket: (q) => api.get('/admin/tickets/search', { params: { q } })
 };
 
 export const reportsAPI = {
   getDaily:         (date)   => api.get('/reports/daily', { params: { date } }),
   getServiceTypes:  (params) => api.get('/reports/service-types', { params }),
   getCategoryStats: ()       => api.get('/reports/category-stats'),
+  getTransfers:     (params) => api.get('/reports/transfers', { params }),
+  getPurposes:      (params) => api.get('/reports/purposes', { params }),
+  getTicketLog:     (params) => api.get('/reports/ticket-log', { params }),
 };
 
 export default api;

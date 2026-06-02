@@ -1,11 +1,12 @@
 const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 Menu.setApplicationMenu(null);
 app.setName('SchoolQ');
-const path = require('path');
-const fs   = require('fs');
-const net  = require('net');
-const os   = require('os');
-const http = require('http');
+const path   = require('path');
+const fs     = require('fs');
+const net    = require('net');
+const os     = require('os');
+const http   = require('http');
+const crypto = require('crypto');
 const { exec } = require('child_process');
 
 let mainWindow;
@@ -117,10 +118,17 @@ async function startLocalServer() {
     await killPort3000(); // foreign process — kill it, then start ours
   }
 
-  process.env.DB_PATH     = path.join(app.getPath('userData'), 'school-queue.db');
-  process.env.PORT        = '3000';
-  process.env.NODE_ENV    = 'production';
-  require('dotenv').config({ path: path.join(__dirname, '../.env') });
+  process.env.DB_PATH  = path.join(app.getPath('userData'), 'school-queue.db');
+  process.env.PORT     = '3000';
+  process.env.NODE_ENV = 'production';
+
+  // Generate a unique JWT secret per installation — stored in userData, never shipped
+  const secretPath = path.join(app.getPath('userData'), 'jwt-secret.txt');
+  if (!fs.existsSync(secretPath)) {
+    fs.writeFileSync(secretPath, crypto.randomBytes(64).toString('hex'), 'utf8');
+  }
+  process.env.JWT_SECRET = fs.readFileSync(secretPath, 'utf8').trim();
+
   require(path.join(__dirname, '../src/backend/server.js'));
 }
 

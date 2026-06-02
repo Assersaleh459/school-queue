@@ -1,12 +1,20 @@
 import { useState, useEffect } from 'react';
 import { adminAPI } from '../../lib/api';
+import { toast } from '../../store/useToastStore';
 
 const ROLES = ['staff', 'admin', 'super_admin'];
+const REPORT_SUB_KEYS = ['reports_daily', 'reports_service_types', 'reports_transfers', 'reports_purposes', 'reports_ticket_log'];
 const ALL_PAGES = [
-  { key: 'reception', label: 'Reception — Create Tickets' },
-  { key: 'queue',     label: 'Queue Dashboard — Serve Tickets' },
-  { key: 'reports',   label: 'Reports' },
-  { key: 'admin',     label: 'Admin Panel' },
+  { key: 'reception',             label: 'Reception — Create Tickets' },
+  { key: 'queue',                 label: 'Queue Dashboard — Serve Tickets' },
+  { key: 'all_queues',            label: 'All Queues — Cross-department view' },
+  { key: 'reports',               label: 'Reports' },
+  { key: 'reports_daily',         label: 'Daily Summary',       sub: true },
+  { key: 'reports_service_types', label: 'Service Types',       sub: true },
+  { key: 'reports_transfers',     label: 'Transfers',           sub: true },
+  { key: 'reports_purposes',      label: 'Visit Purposes',      sub: true },
+  { key: 'reports_ticket_log',    label: 'Ticket Log',          sub: true },
+  { key: 'admin',                 label: 'Admin Panel' },
 ];
 const EMPTY = { username: '', password: '', full_name: '', role: 'staff', department_id: '', is_active: true, allowed_pages: null };
 
@@ -24,6 +32,7 @@ export default function Users() {
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     loadUsers();
@@ -38,6 +47,7 @@ export default function Users() {
     setEditing(null);
     setForm(EMPTY);
     setError('');
+    setShowDeleteConfirm(false);
     setShowForm(true);
   };
 
@@ -49,15 +59,37 @@ export default function Users() {
     }
     setForm({ username: u.username, password: '', full_name: u.full_name, role: u.role, department_id: u.department_id || '', is_active: !!u.is_active, allowed_pages: pages });
     setError('');
+    setShowDeleteConfirm(false);
     setShowForm(true);
   };
 
   const togglePage = (key) => {
     setForm(f => {
       const current = f.allowed_pages || [];
-      const next = current.includes(key) ? current.filter(p => p !== key) : [...current, key];
+      const isAdding = !current.includes(key);
+      let next = isAdding ? [...current, key] : current.filter(p => p !== key);
+      if (REPORT_SUB_KEYS.includes(key)) {
+        if (isAdding) {
+          if (!next.includes('reports')) next = [...next, 'reports'];
+        } else {
+          if (!REPORT_SUB_KEYS.some(k => next.includes(k))) next = next.filter(p => p !== 'reports');
+        }
+      }
       return { ...f, allowed_pages: next.length ? next : null };
     });
+  };
+
+  const handleDelete = async () => {
+    try {
+      await adminAPI.deleteUser(editing.user_id);
+      setShowForm(false);
+      setShowDeleteConfirm(false);
+      toast.success(`${editing.full_name} deleted`);
+      loadUsers();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Delete failed');
+      setShowDeleteConfirm(false);
+    }
   };
 
   const handleSave = async (e) => {
@@ -94,7 +126,7 @@ export default function Users() {
       });
       loadUsers();
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to update user');
+      toast.error(err.response?.data?.error || 'Failed to update user');
     }
   };
 
@@ -231,14 +263,14 @@ export default function Users() {
                 </label>
                 <div className="border rounded-lg p-3 space-y-2">
                   {ALL_PAGES.map(p => (
-                    <label key={p.key} className="flex items-center gap-2 cursor-pointer">
+                    <label key={p.key} className={`flex items-center gap-2 cursor-pointer${p.sub ? ' ml-6' : ''}`}>
                       <input
                         type="checkbox"
                         checked={form.allowed_pages ? form.allowed_pages.includes(p.key) : false}
                         onChange={() => togglePage(p.key)}
                         className="w-4 h-4 accent-teal"
                       />
-                      <span className="text-sm text-gray-700">{p.label}</span>
+                      <span className={`text-sm ${p.sub ? 'text-gray-500' : 'text-gray-700'}`}>{p.label}</span>
                     </label>
                   ))}
                 </div>
@@ -266,12 +298,44 @@ export default function Users() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowForm(false)}
+                  onClick={() => { setShowForm(false); setShowDeleteConfirm(false); }}
                   className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg font-semibold hover:bg-gray-300"
                 >
                   Cancel
                 </button>
               </div>
+
+              {editing && editing.role !== 'super_admin' && (
+                <div className="pt-3 border-t">
+                  {!showDeleteConfirm ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowDeleteConfirm(true)}
+                      className="text-red-500 text-sm hover:underline"
+                    >
+                      Delete this user
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-lg p-3">
+                      <p className="text-sm text-red-700 flex-1">Permanently delete <strong>{editing.full_name}</strong>?</p>
+                      <button
+                        type="button"
+                        onClick={handleDelete}
+                        className="px-3 py-1 bg-red-600 text-white rounded text-sm font-semibold hover:bg-red-700"
+                      >
+                        Yes, Delete
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowDeleteConfirm(false)}
+                        className="px-3 py-1 bg-gray-200 text-gray-700 rounded text-sm"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </form>
           </div>
         </div>

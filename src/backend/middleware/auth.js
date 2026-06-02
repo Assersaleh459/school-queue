@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const db = require('../database/db');
 
 function authMiddleware(req, res, next) {
   const token = req.headers.authorization?.replace('Bearer ', '');
@@ -9,6 +10,10 @@ function authMiddleware(req, res, next) {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = db.prepare('SELECT is_active FROM users WHERE user_id = ?').get(decoded.user_id);
+    if (!user || !user.is_active) {
+      return res.status(401).json({ error: 'Account deactivated' });
+    }
     req.user = decoded;
     next();
   } catch (error) {

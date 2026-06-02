@@ -3,6 +3,7 @@ const router = express.Router();
 const authController = require('../controllers/authController');
 const { authMiddleware } = require('../middleware/auth');
 const rateLimit = require('express-rate-limit');
+const { rules, checkValidation } = require('../middleware/validate');
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -12,8 +13,8 @@ const loginLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-router.post('/login', loginLimiter, authController.login);
+router.post('/login', loginLimiter, rules.login, checkValidation, authController.login);
 router.get('/me', authMiddleware, authController.me);
-router.put('/change-password', authMiddleware, authController.changePassword);
+router.put('/change-password', authMiddleware, rules.changePassword, checkValidation, authController.changePassword);
 
 module.exports = router;

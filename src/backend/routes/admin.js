@@ -5,6 +5,8 @@ const bcrypt = require('bcrypt');
 const { authMiddleware, requireRole } = require('../middleware/auth');
 const { invalidate: invalidateSettingsCache } = require('../settingsCache');
 const { log } = require('../audit');
+const socketHandlers = require('../socket/handlers');
+const { rules, checkValidation } = require('../middleware/validate');
 
 router.use(authMiddleware, requireRole('super_admin', 'admin'));
 
@@ -25,6 +27,7 @@ router.put('/settings', requireRole('super_admin'), (req, res) => {
     });
     runAll(req.body);
     invalidateSettingsCache();
+    req.io.emit('settings_updated');
     log(req.user?.user_id, 'SETTINGS_UPDATED', 'settings', null, { keys: Object.keys(req.body) });
     res.json({ success: true });
   } catch (error) {
@@ -33,15 +36,29 @@ router.put('/settings', requireRole('super_admin'), (req, res) => {
   }
 });
 
+// --- Ticket search (for reprint) ---
+router.get('/tickets/search', (req, res) => {
+  const { q } = req.query;
+  if (!q) return res.status(400).json({ error: 'Search query required' });
+  const ticket = db.prepare(`
+    SELECT t.*, d.name as department_name, c.name as category_name
+    FROM tickets t
+    LEFT JOIN departments d ON t.department_id = d.department_id
+    LEFT JOIN service_categories c ON t.category_id = c.category_id
+    WHERE t.ticket_number = ?
+  `).get(q.trim().toUpperCase());
+  if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+  res.json(ticket);
+});
+
 // --- Departments ---
 router.get('/departments', (req, res) => {
   const depts = db.prepare('SELECT * FROM departments ORDER BY display_order').all();
   res.json(depts);
 });
 
-router.post('/departments', requireRole('super_admin'), (req, res) => {
+router.post('/departments', requireRole('super_admin'), rules.createDepartment, checkValidation, (req, res) => {
   const { name, name_ar, code, color_code, display_order, is_active, room_number } = req.body;
-  if (!name || !code) return res.status(400).json({ error: 'Name and code are required' });
   try {
     const result = db.prepare(
       'INSERT INTO departments (name, name_ar, code, color_code, display_order, is_active, room_number) VALUES (?, ?, ?, ?, ?, ?, ?)'
@@ -54,7 +71,7 @@ router.post('/departments', requireRole('super_admin'), (req, res) => {
   }
 });
 
-router.put('/departments/:id', requireRole('super_admin'), (req, res) => {
+router.put('/departments/:id', requireRole('super_admin'), rules.updateDepartment, checkValidation, (req, res) => {
   const { name, name_ar, code, color_code, display_order, is_active, room_number } = req.body;
   try {
     db.prepare(`
@@ -80,11 +97,8 @@ router.get('/users', (req, res) => {
   res.json(users);
 });
 
-router.post('/users', requireRole('super_admin'), async (req, res) => {
+router.post('/users', requireRole('super_admin'), rules.createUser, checkValidation, async (req, res) => {
   const { username, password, full_name, role, department_id, is_active, allowed_pages } = req.body;
-  if (!username || !password || !full_name || !role) {
-    return res.status(400).json({ error: 'username, password, full_name, and role are required' });
-  }
   try {
     const hash = await bcrypt.hash(password, 10);
     const pages = Array.isArray(allowed_pages) && allowed_pages.length ? JSON.stringify(allowed_pages) : null;
@@ -99,7 +113,7 @@ router.post('/users', requireRole('super_admin'), async (req, res) => {
   }
 });
 
-router.put('/users/:id', requireRole('super_admin'), async (req, res) => {
+router.put('/users/:id', requireRole('super_admin'), rules.updateUser, checkValidation, async (req, res) => {
   const { full_name, role, department_id, is_active, password, allowed_pages } = req.body;
   const target = db.prepare('SELECT * FROM users WHERE user_id = ?').get(req.params.id);
   if (!target) return res.status(404).json({ error: 'User not found' });
@@ -117,10 +131,24 @@ router.put('/users/:id', requireRole('super_admin'), async (req, res) => {
       WHERE user_id=?
     `).run(full_name, role, department_id || null, is_active ? 1 : 0, hash, pages, req.params.id);
     log(req.user?.user_id, 'USER_UPDATED', 'user', parseInt(req.params.id), { full_name, role, is_active });
+    if (is_active === 0 || is_active === false) {
+      socketHandlers.forceLogout(parseInt(req.params.id));
+    }
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Failed to update user' });
   }
+});
+
+router.delete('/users/:id', requireRole('super_admin'), (req, res) => {
+  const target = db.prepare('SELECT * FROM users WHERE user_id = ?').get(req.params.id);
+  if (!target) return res.status(404).json({ error: 'User not found' });
+  if (target.role === 'super_admin') return res.status(403).json({ error: 'Cannot delete a super_admin account' });
+  const hasTickets = db.prepare('SELECT 1 FROM tickets WHERE served_by_user_id = ? LIMIT 1').get(req.params.id);
+  if (hasTickets) return res.status(409).json({ error: 'User has ticket history. Deactivate instead of deleting.' });
+  db.prepare('DELETE FROM users WHERE user_id = ?').run(req.params.id);
+  log(req.user?.user_id, 'USER_DELETED', 'user', parseInt(req.params.id), { username: target.username });
+  res.json({ success: true });
 });
 
 // --- Service Categories ---
@@ -163,9 +191,8 @@ router.get('/announcements', (req, res) => {
   res.json(rows);
 });
 
-router.post('/announcements', requireRole('super_admin'), (req, res) => {
+router.post('/announcements', requireRole('super_admin'), rules.createAnnouncement, checkValidation, (req, res) => {
   const { message_text, message_text_ar, speak_language, display_order, is_active } = req.body;
-  if (!message_text) return res.status(400).json({ error: 'message_text is required' });
   const result = db.prepare(
     'INSERT INTO announcements (message_text, message_text_ar, speak_language, display_order, is_active) VALUES (?, ?, ?, ?, ?)'
   ).run(message_text, message_text_ar || null, speak_language || 'en', display_order || 99, is_active ? 1 : 0);
@@ -173,7 +200,7 @@ router.post('/announcements', requireRole('super_admin'), (req, res) => {
   res.json({ success: true, announcement_id: result.lastInsertRowid });
 });
 
-router.put('/announcements/:id', requireRole('super_admin'), (req, res) => {
+router.put('/announcements/:id', requireRole('super_admin'), rules.updateAnnouncement, checkValidation, (req, res) => {
   const { message_text, message_text_ar, speak_language, display_order, is_active } = req.body;
   db.prepare(
     'UPDATE announcements SET message_text=?, message_text_ar=?, speak_language=?, display_order=?, is_active=? WHERE announcement_id=?'

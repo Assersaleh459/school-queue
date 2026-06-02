@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { io } from 'socket.io-client';
 import { departmentAPI, queueAPI, settingsAPI } from '../../lib/api';
 import useAuthStore from '../../store/useAuthStore';
+import { toast } from '../../store/useToastStore';
 
 const PRIORITY_COLORS = {
   urgent:  'bg-red-100 text-red-800',
@@ -81,17 +82,17 @@ export default function QueueControl() {
 
   const callNext = async (dept) => {
     try { await queueAPI.callNext(dept.department_id, user.user_id); }
-    catch (err) { alert(err.response?.data?.error || 'Failed to call next'); }
+    catch (err) { toast.error(err.response?.data?.error || 'Failed to call next'); }
   };
 
   const complete = async (ticket) => {
     try { await queueAPI.complete(ticket.ticket_id, ''); }
-    catch { alert('Failed to complete'); }
+    catch { toast.error('Failed to complete'); }
   };
 
   const recall = async (ticket) => {
     try { await queueAPI.recall(ticket.ticket_id); }
-    catch { alert('Failed to recall'); }
+    catch { toast.error('Failed to recall'); }
   };
 
   const confirmSkip = async () => {
@@ -99,14 +100,14 @@ export default function QueueControl() {
     try {
       await queueAPI.skip(skipModal.ticket_id, skipReason.trim());
       setSkipModal(null); setSkipReason('');
-    } catch { alert('Failed to skip'); }
+    } catch { toast.error('Failed to skip'); }
   };
 
   const confirmNoShow = async () => {
     try {
       await queueAPI.noShow(noShowModal.ticket_id);
       setNoShowModal(null);
-    } catch (err) { alert(err.response?.data?.error || 'Failed to mark no-show'); }
+    } catch (err) { toast.error(err.response?.data?.error || 'Failed to mark no-show'); }
   };
 
   const confirmTransfer = async () => {
@@ -114,7 +115,7 @@ export default function QueueControl() {
     try {
       await queueAPI.transfer(transferModal.ticket.ticket_id, parseInt(transferDept), transferReason.trim(), user.user_id);
       setTransferModal(null); setTransferDept(''); setTransferReason('');
-    } catch { alert('Failed to transfer'); }
+    } catch { toast.error('Failed to transfer'); }
   };
 
   const otherDepts = (deptId) => departments.filter(d => d.department_id !== deptId);

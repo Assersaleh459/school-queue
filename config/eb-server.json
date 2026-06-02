@@ -1,5 +1,4 @@
-{
-  "appId": "com.vyrasystems.schoolqueue.server",
+{"appId": "com.vyrasystems.schoolqueue.server",
   "productName": "SchoolQ Server",
   "buildDependenciesFromSource": true,
   "directories": {
@@ -7,7 +6,7 @@
     "buildResources": "electron"
   },
   "extraMetadata": {
-    "version": "1.5.15"
+    "version": "1.5.25"
   },
   "extraResources": [
     {
@@ -20,8 +19,7 @@
     "src/backend/**/*",
     "src/frontend/dist/**/*",
     "config/**/*",
-    "package.json",
-    ".env"
+    "package.json"
   ],
   "win": {
     "target": ["nsis"],
@@ -36,3 +34,4 @@
     "shortcutName": "SchoolQ Server"
   }
 }
+

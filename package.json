@@ -1,6 +1,5 @@
-{
-  "name": "school-queue",
-  "version": "1.5.15",
+{"name": "school-queue",
+  "version": "1.5.25",
   "description": "Queue management system for Al-Noor International School",
   "author": "Vyra Systems <asserhegazy@vyra-systems.com>",
   "main": "electron/main.js",
@@ -19,7 +18,8 @@
     "predist": "powershell -Command \"try { $p=(Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction Stop).OwningProcess; Stop-Process -Id $p -Force; Write-Host 'Stopped server on port 3000' } catch { Write-Host 'No server running on port 3000' }\"",
     "dist": "npm run build:frontend && powershell -Command \"$env:CSC_IDENTITY_AUTO_DISCOVERY='false'; $env:WIN_CSC_LINK=''; electron-builder --win\"",
     "dist:server": "npm run build:frontend && powershell -Command \"$env:CSC_IDENTITY_AUTO_DISCOVERY='false'; $env:WIN_CSC_LINK=''; node node_modules/electron-builder/out/cli/cli.js --win --config config/eb-server.json\"",
-    "dist:staff": "npm run build:frontend && powershell -Command \"$env:CSC_IDENTITY_AUTO_DISCOVERY='false'; $env:WIN_CSC_LINK=''; node node_modules/electron-builder/out/cli/cli.js --win --config config/eb-staff.json\""
+    "dist:staff": "npm run build:frontend && powershell -Command \"$env:CSC_IDENTITY_AUTO_DISCOVERY='false'; $env:WIN_CSC_LINK=''; node node_modules/electron-builder/out/cli/cli.js --win --config config/eb-staff.json\"",
+    "test": "jest --testPathPatterns=src/backend/tests"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",
@@ -29,6 +29,7 @@
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "express-rate-limit": "^8.5.1",
+    "express-validator": "^7.3.2",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.1",
     "socket.io": "^4.6.1"
@@ -37,7 +38,16 @@
     "concurrently": "^9.2.1",
     "electron": "^41.3.0",
     "electron-builder": "^26.8.1",
-    "nodemon": "^3.0.2"
+    "jest": "^30.4.2",
+    "nodemon": "^3.0.2",
+    "pdfkit": "^0.18.0",
+    "supertest": "^7.2.2"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ]
   },
   "build": {
     "appId": "com.vyrasystems.schoolqueue",
@@ -51,8 +61,7 @@
       "src/backend/**/*",
       "src/frontend/dist/**/*",
       "config/**/*",
-      "package.json",
-      ".env"
+      "package.json"
     ],
     "win": {
       "target": [
@@ -70,3 +79,4 @@
     }
   }
 }
+

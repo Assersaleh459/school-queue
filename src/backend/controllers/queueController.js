@@ -167,6 +167,7 @@ exports.skip = (req, res) => {
 
 exports.noShow = (req, res) => {
   const { ticket_id } = req.params;
+  const { reason } = req.body;
 
   try {
     const ticket = db.prepare('SELECT * FROM tickets WHERE ticket_id = ?').get(ticket_id);
@@ -182,16 +183,47 @@ exports.noShow = (req, res) => {
     db.prepare(`
       UPDATE tickets SET
         status = 'no_show',
-        completed_at = datetime('now')
+        completed_at = datetime('now'),
+        notes = ?
       WHERE ticket_id = ?
-    `).run(ticket_id);
+    `).run(reason ? `No-Show: ${reason.trim()}` : null, ticket_id);
 
     req.io.to(`dept_${ticket.department_id}`).emit('queue_updated');
-    log(req.user?.user_id, 'TICKET_NO_SHOW', 'ticket', ticket_id, { ticket_number: ticket.ticket_number });
+    log(req.user?.user_id, 'TICKET_NO_SHOW', 'ticket', ticket_id, { ticket_number: ticket.ticket_number, reason });
 
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Failed to mark no-show' });
+  }
+};
+
+exports.cancel = (req, res) => {
+  const { ticket_id } = req.params;
+  const { reason } = req.body;
+
+  if (!reason || !reason.trim()) {
+    return res.status(422).json({ error: 'Cancellation reason is required' });
+  }
+
+  try {
+    const ticket = db.prepare('SELECT * FROM tickets WHERE ticket_id = ?').get(ticket_id);
+    if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+
+    db.prepare(`
+      UPDATE tickets SET
+        status = 'cancelled',
+        completed_at = datetime('now'),
+        notes = ?
+      WHERE ticket_id = ?
+    `).run(`Cancelled: ${reason.trim()}`, ticket_id);
+
+    req.io.to(`dept_${ticket.department_id}`).emit('queue_updated');
+    log(req.user?.user_id, 'TICKET_CANCELLED', 'ticket', ticket_id, { ticket_number: ticket.ticket_number, reason });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Cancel error:', error);
+    res.status(500).json({ error: 'Failed to cancel ticket' });
   }
 };
 
@@ -206,38 +238,39 @@ exports.transfer = (req, res) => {
     const toDept = db.prepare('SELECT * FROM departments WHERE department_id = ?').get(to_dept_id);
     if (!toDept) return res.status(404).json({ error: 'Target department not found' });
 
-    const { generateTicketNumber } = require('./ticketController');
-    const newTicketNumber = generateTicketNumber(toDept.code, new Date(), original.priority);
+    const fromDept = db.prepare('SELECT name FROM departments WHERE department_id = ?').get(original.department_id);
 
-    const result = db.prepare(`
-      INSERT INTO tickets (
-        ticket_number, department_id, category_id, parent_name, student_name,
-        student_id, phone, purpose, priority, status, parent_session_id, transferred_from
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'waiting', ?, ?)
-    `).run(
-      newTicketNumber, to_dept_id, null, original.parent_name, original.student_name,
-      original.student_id, original.phone, `Transfer: ${reason}`, original.priority,
-      original.parent_session_id || original.ticket_number, ticket_id
-    );
-
+    // Move the same ticket to the new department — keep ticket_number unchanged
     db.prepare(`
       UPDATE tickets SET
-        status = 'transferred',
-        completed_at = datetime('now'),
+        department_id = ?,
+        category_id = NULL,
+        status = 'waiting',
+        called_at = NULL,
+        served_by_user_id = NULL,
+        call_count = 0,
+        purpose = ?,
         notes = ?
       WHERE ticket_id = ?
-    `).run(`Transferred to ${toDept.name}`, ticket_id);
+    `).run(
+      to_dept_id,
+      `Transfer: ${reason}`,
+      `Transferred from ${fromDept?.name || 'another dept'} to ${toDept.name}`,
+      ticket_id
+    );
 
     db.prepare(`
       INSERT INTO transfers (original_ticket_id, new_ticket_id, from_dept_id, to_dept_id, transferred_by, reason)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run(ticket_id, result.lastInsertRowid, original.department_id, to_dept_id, staff_id, reason);
+    `).run(ticket_id, ticket_id, original.department_id, to_dept_id, staff_id, reason);
 
     req.io.to(`dept_${original.department_id}`).emit('queue_updated');
     req.io.to(`dept_${to_dept_id}`).emit('queue_updated');
-    log(staff_id, 'TICKET_TRANSFERRED', 'ticket', ticket_id, { from: original.ticket_number, to: newTicketNumber, to_dept: toDept.name, reason });
+    log(staff_id, 'TICKET_TRANSFERRED', 'ticket', ticket_id, {
+      ticket_number: original.ticket_number, from_dept: fromDept?.name, to_dept: toDept.name, reason
+    });
 
-    res.json({ success: true, new_ticket_number: newTicketNumber });
+    res.json({ success: true, ticket_number: original.ticket_number });
   } catch (error) {
     console.error('Transfer error:', error);
     res.status(500).json({ error: 'Failed to transfer ticket' });

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api, { adminAPI, reportsAPI } from '../lib/api';
+import { toast } from '../store/useToastStore';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
@@ -32,7 +33,7 @@ function DailySummary() {
       const res = await api.get(`/reports/daily?date=${date}`);
       setReportData(res.data);
     } catch {
-      alert('Failed to fetch report. Make sure you have admin access.');
+      toast.error('Failed to fetch report. Make sure you have admin access.');
     } finally {
       setLoading(false);
     }
@@ -202,7 +203,7 @@ function ServiceTypeReport() {
       const res = await reportsAPI.getServiceTypes(params);
       setReportData(res.data);
     } catch {
-      alert('Failed to fetch service type report.');
+      toast.error('Failed to fetch service type report.');
     } finally {
       setLoading(false);
     }
@@ -389,12 +390,555 @@ function ServiceTypeReport() {
   );
 }
 
+// ── Transfer Report ───────────────────────────────────────────────────────────
+
+function TransferReport() {
+  const [fromDate, setFromDate]       = useState(today);
+  const [toDate, setToDate]           = useState(today);
+  const [deptId, setDeptId]           = useState('');
+  const [departments, setDepartments] = useState([]);
+  const [data, setData]               = useState(null);
+  const [loading, setLoading]         = useState(false);
+
+  useEffect(() => {
+    adminAPI.getDepartments().then(r => setDepartments(r.data)).catch(() => {});
+  }, []);
+
+  const fetchReport = async () => {
+    setLoading(true);
+    try {
+      const params = { from: fromDate, to: toDate };
+      if (deptId) params.dept_id = deptId;
+      const res = await reportsAPI.getTransfers(params);
+      setData(res.data);
+    } catch { toast.error('Failed to fetch transfers report.'); }
+    finally { setLoading(false); }
+  };
+
+  const exportToPDF = () => {
+    const doc = new jsPDF('l', 'mm', 'a4');
+    doc.setFontSize(16); doc.text('Transfers Report', 14, 18);
+    doc.setFontSize(10); doc.text(`Period: ${fromDate} to ${toDate}`, 14, 25);
+    doc.autoTable({
+      startY: 30,
+      head: [['Date & Time', 'Ticket #', 'Parent', 'Student', 'From', 'To', 'Reason', 'By']],
+      body: data.map(r => [
+        new Date(r.transferred_at).toLocaleString(), r.ticket_number,
+        r.parent_name, r.student_name || '—',
+        r.from_department, r.to_department, r.reason || '—', r.transferred_by || '—'
+      ]),
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [25, 34, 74] },
+    });
+    doc.save(`transfers-${fromDate}-${toDate}.pdf`);
+  };
+
+  const exportToExcel = () => {
+    const rows = data.map(r => ({
+      'Date': new Date(r.transferred_at).toLocaleString(),
+      'Ticket #': r.ticket_number, 'Parent': r.parent_name, 'Student': r.student_name || '',
+      'From': r.from_department, 'To': r.to_department,
+      'Reason': r.reason || '', 'Transferred By': r.transferred_by || ''
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Transfers');
+    XLSX.writeFile(wb, `transfers-${fromDate}-${toDate}.xlsx`);
+  };
+
+  return (
+    <div>
+      <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+        <h2 className="text-lg font-bold text-navy mb-4">Transfers Report</h2>
+        <div className="flex flex-wrap items-end gap-4">
+          <div>
+            <label className="block text-sm font-semibold text-gray-600 mb-1">From</label>
+            <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
+              className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal" />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-600 mb-1">To</label>
+            <input type="date" value={toDate} onChange={e => setToDate(e.target.value)}
+              className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal" />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-600 mb-1">Department</label>
+            <select value={deptId} onChange={e => setDeptId(e.target.value)}
+              className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal">
+              <option value="">All Departments</option>
+              {departments.map(d => <option key={d.department_id} value={d.department_id}>{d.name}</option>)}
+            </select>
+          </div>
+          <button onClick={fetchReport} disabled={loading}
+            className="px-8 py-2 bg-teal text-white rounded-lg hover:bg-opacity-90 font-semibold disabled:opacity-50">
+            {loading ? 'Loading...' : 'Generate Report'}
+          </button>
+        </div>
+      </div>
+
+      {data && data.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xl font-bold text-navy">{data.length} Transfer{data.length !== 1 ? 's' : ''}</h3>
+            <div className="flex gap-2">
+              <button onClick={exportToPDF} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-semibold">Export PDF</button>
+              <button onClick={exportToExcel} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-semibold">Export Excel</button>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-navy text-white">
+                <tr>
+                  <th className="px-4 py-3 text-left">Date & Time</th>
+                  <th className="px-4 py-3 text-left">Ticket #</th>
+                  <th className="px-4 py-3 text-left">Parent</th>
+                  <th className="px-4 py-3 text-left">Student</th>
+                  <th className="px-4 py-3 text-left">From</th>
+                  <th className="px-4 py-3 text-left">To</th>
+                  <th className="px-4 py-3 text-left">Reason</th>
+                  <th className="px-4 py-3 text-left">By</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.map(r => (
+                  <tr key={r.transfer_id} className="border-b hover:bg-gray-50">
+                    <td className="px-4 py-3 text-gray-500 text-xs">{new Date(r.transferred_at).toLocaleString()}</td>
+                    <td className="px-4 py-3 font-mono font-bold">{r.ticket_number}</td>
+                    <td className="px-4 py-3">{r.parent_name}</td>
+                    <td className="px-4 py-3 text-gray-500">{r.student_name || '—'}</td>
+                    <td className="px-4 py-3 text-orange-600 font-semibold">{r.from_department}</td>
+                    <td className="px-4 py-3 text-teal font-semibold">{r.to_department}</td>
+                    <td className="px-4 py-3 text-gray-600">{r.reason || '—'}</td>
+                    <td className="px-4 py-3 text-gray-500">{r.transferred_by || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {data?.length === 0 && (
+        <div className="bg-white rounded-xl shadow-sm p-12 text-center text-gray-400 text-lg">
+          No transfers found for the selected period.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Visit Purpose Report ──────────────────────────────────────────────────────
+
+function PurposeReport() {
+  const [fromDate, setFromDate]       = useState(today);
+  const [toDate, setToDate]           = useState(today);
+  const [deptId, setDeptId]           = useState('');
+  const [departments, setDepartments] = useState([]);
+  const [data, setData]               = useState(null);
+  const [loading, setLoading]         = useState(false);
+
+  useEffect(() => {
+    adminAPI.getDepartments().then(r => setDepartments(r.data)).catch(() => {});
+  }, []);
+
+  const fetchReport = async () => {
+    setLoading(true);
+    try {
+      const params = { from: fromDate, to: toDate };
+      if (deptId) params.dept_id = deptId;
+      const res = await reportsAPI.getPurposes(params);
+      setData(res.data);
+    } catch { toast.error('Failed to fetch purposes report.'); }
+    finally { setLoading(false); }
+  };
+
+  const total = data ? data.reduce((s, r) => s + r.total, 0) : 0;
+
+  const exportToPDF = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(16); doc.text('Visit Purpose Report', 14, 18);
+    doc.setFontSize(10); doc.text(`Period: ${fromDate} to ${toDate}`, 14, 25);
+    doc.autoTable({
+      startY: 30,
+      head: [['Purpose', 'Department', 'Count', 'Served', '%']],
+      body: data.map(r => [r.purpose, r.department, r.total, r.served, total ? `${Math.round(r.total / total * 100)}%` : '—']),
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [25, 34, 74] },
+    });
+    doc.save(`purposes-${fromDate}-${toDate}.pdf`);
+  };
+
+  const exportToExcel = () => {
+    const rows = data.map(r => ({
+      Purpose: r.purpose, Department: r.department,
+      Count: r.total, Served: r.served,
+      '%': total ? Math.round(r.total / total * 100) : 0
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Visit Purposes');
+    XLSX.writeFile(wb, `purposes-${fromDate}-${toDate}.xlsx`);
+  };
+
+  return (
+    <div>
+      <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+        <h2 className="text-lg font-bold text-navy mb-4">Visit Purpose Report</h2>
+        <div className="flex flex-wrap items-end gap-4">
+          <div>
+            <label className="block text-sm font-semibold text-gray-600 mb-1">From</label>
+            <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
+              className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal" />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-600 mb-1">To</label>
+            <input type="date" value={toDate} onChange={e => setToDate(e.target.value)}
+              className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal" />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-600 mb-1">Department</label>
+            <select value={deptId} onChange={e => setDeptId(e.target.value)}
+              className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal">
+              <option value="">All Departments</option>
+              {departments.map(d => <option key={d.department_id} value={d.department_id}>{d.name}</option>)}
+            </select>
+          </div>
+          <button onClick={fetchReport} disabled={loading}
+            className="px-8 py-2 bg-teal text-white rounded-lg hover:bg-opacity-90 font-semibold disabled:opacity-50">
+            {loading ? 'Loading...' : 'Generate Report'}
+          </button>
+        </div>
+      </div>
+
+      {data && data.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xl font-bold text-navy">{data.length} distinct purpose{data.length !== 1 ? 's' : ''} — {total} total visits</h3>
+            <div className="flex gap-2">
+              <button onClick={exportToPDF} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-semibold">Export PDF</button>
+              <button onClick={exportToExcel} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-semibold">Export Excel</button>
+            </div>
+          </div>
+          <table className="w-full text-sm">
+            <thead className="bg-navy text-white">
+              <tr>
+                <th className="px-4 py-3 text-left">Purpose</th>
+                <th className="px-4 py-3 text-left">Department</th>
+                <th className="px-4 py-3 text-right">Count</th>
+                <th className="px-4 py-3 text-right">Served</th>
+                <th className="px-4 py-3 text-right">Share</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((r, i) => (
+                <tr key={i} className="border-b hover:bg-gray-50">
+                  <td className="px-4 py-3 font-medium">{r.purpose}</td>
+                  <td className="px-4 py-3 text-gray-500">{r.department}</td>
+                  <td className="px-4 py-3 text-right font-bold">{r.total}</td>
+                  <td className="px-4 py-3 text-right text-teal">{r.served}</td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <div className="w-16 bg-gray-200 rounded-full h-2">
+                        <div className="bg-teal h-2 rounded-full" style={{ width: `${total ? Math.round(r.total / total * 100) : 0}%` }} />
+                      </div>
+                      <span className="text-xs text-gray-500 w-8 text-right">{total ? Math.round(r.total / total * 100) : 0}%</span>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {data?.length === 0 && (
+        <div className="bg-white rounded-xl shadow-sm p-12 text-center text-gray-400 text-lg">
+          No purpose data found for the selected period.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Ticket Log ───────────────────────────────────────────────────────────────
+
+const STATUS_STYLE = {
+  waiting:   'bg-yellow-100 text-yellow-800',
+  called:    'bg-blue-100 text-blue-700',
+  serving:   'bg-blue-100 text-blue-700',
+  completed: 'bg-green-100 text-green-700',
+  skipped:   'bg-orange-100 text-orange-700',
+  no_show:   'bg-red-100 text-red-700',
+  cancelled: 'bg-gray-100 text-gray-600',
+};
+
+const PRIORITY_STYLE = {
+  urgent:  'bg-red-100 text-red-700',
+  elderly: 'bg-orange-100 text-orange-700',
+  vip:     'bg-purple-100 text-purple-700',
+  regular: '',
+};
+
+function TicketLog() {
+  const [fromDate, setFromDate]       = useState(today);
+  const [toDate, setToDate]           = useState(today);
+  const [deptId, setDeptId]           = useState('');
+  const [status, setStatus]           = useState('all');
+  const [search, setSearch]           = useState('');
+  const [departments, setDepartments] = useState([]);
+  const [data, setData]               = useState(null);
+  const [loading, setLoading]         = useState(false);
+
+  useEffect(() => {
+    adminAPI.getDepartments().then(r => setDepartments(r.data)).catch(() => {});
+  }, []);
+
+  const fetchReport = async () => {
+    setLoading(true);
+    try {
+      const params = { from: fromDate, to: toDate };
+      if (deptId)             params.dept_id = deptId;
+      if (status !== 'all')   params.status  = status;
+      if (search.trim())      params.search  = search.trim();
+      const res = await reportsAPI.getTicketLog(params);
+      setData(res.data);
+    } catch { toast.error('Failed to fetch ticket log.'); }
+    finally { setLoading(false); }
+  };
+
+  const fmt = (iso) => iso ? new Date(iso).toLocaleString() : '—';
+  const fmtTime = (iso) => iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+
+  const exportToPDF = () => {
+    const doc = new jsPDF('l', 'mm', 'a4');
+    doc.setFontSize(16); doc.text('Ticket Log', 14, 18);
+    doc.setFontSize(10); doc.text(`Period: ${fromDate} to ${toDate}  |  Total: ${data.length} tickets`, 14, 25);
+    doc.autoTable({
+      startY: 30,
+      head: [['#', 'Ticket', 'Department', 'Service', 'Parent', 'Student', 'Priority', 'Status',
+              'Created', 'Called', 'Completed', 'Wait (min)', 'Service (min)', 'Served By', 'Purpose', 'Notes']],
+      body: data.map((r, i) => [
+        i + 1,
+        r.ticket_number,
+        r.department,
+        r.service_type || '—',
+        r.parent_name,
+        r.student_name || '—',
+        r.priority,
+        r.status,
+        fmtTime(r.created_at),
+        fmtTime(r.called_at),
+        fmtTime(r.completed_at),
+        r.wait_minutes ?? '—',
+        r.service_duration ?? '—',
+        r.served_by || '—',
+        r.purpose || '—',
+        r.notes || '—',
+      ]),
+      styles: { fontSize: 7 },
+      headStyles: { fillColor: [25, 34, 74], fontSize: 7 },
+      columnStyles: { 0: { cellWidth: 8 } },
+    });
+    doc.save(`ticket-log-${fromDate}-${toDate}.pdf`);
+  };
+
+  const exportToExcel = () => {
+    const rows = data.map(r => ({
+      'Ticket #':       r.ticket_number,
+      'Department':     r.department,
+      'Service Type':   r.service_type || '',
+      'Parent Name':    r.parent_name,
+      'Student Name':   r.student_name || '',
+      'Student ID':     r.student_id || '',
+      'Phone':          r.phone || '',
+      'Priority':       r.priority,
+      'Status':         r.status,
+      'Purpose':        r.purpose || '',
+      'Notes':          r.notes || '',
+      'Created At':     fmt(r.created_at),
+      'Called At':      fmt(r.called_at),
+      'Completed At':   fmt(r.completed_at),
+      'Wait (min)':     r.wait_minutes ?? '',
+      'Service (min)':  r.service_duration ?? '',
+      'Call Count':     r.call_count,
+      'Served By':      r.served_by || '',
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Ticket Log');
+    XLSX.writeFile(wb, `ticket-log-${fromDate}-${toDate}.xlsx`);
+  };
+
+  return (
+    <div>
+      {/* Filters */}
+      <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+        <h2 className="text-lg font-bold text-navy mb-4">Ticket Log — Full Detail</h2>
+        <div className="flex flex-wrap items-end gap-4">
+          <div>
+            <label className="block text-sm font-semibold text-gray-600 mb-1">From</label>
+            <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
+              className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal" />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-600 mb-1">To</label>
+            <input type="date" value={toDate} onChange={e => setToDate(e.target.value)}
+              className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal" />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-600 mb-1">Department</label>
+            <select value={deptId} onChange={e => setDeptId(e.target.value)}
+              className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal">
+              <option value="">All Departments</option>
+              {departments.map(d => <option key={d.department_id} value={d.department_id}>{d.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-600 mb-1">Status</label>
+            <select value={status} onChange={e => setStatus(e.target.value)}
+              className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal">
+              <option value="all">All Statuses</option>
+              <option value="waiting">Waiting</option>
+              <option value="called">Called</option>
+              <option value="completed">Completed</option>
+              <option value="skipped">Skipped</option>
+              <option value="no_show">No-Show</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-600 mb-1">Search</label>
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Ticket #, parent, student…"
+              className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal w-52"
+              onKeyDown={e => e.key === 'Enter' && fetchReport()}
+            />
+          </div>
+          <button onClick={fetchReport} disabled={loading}
+            className="px-8 py-2 bg-teal text-white rounded-lg hover:bg-opacity-90 font-semibold disabled:opacity-50">
+            {loading ? 'Loading...' : 'Generate'}
+          </button>
+        </div>
+      </div>
+
+      {/* Results */}
+      {data && data.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h3 className="text-xl font-bold text-navy">{data.length} ticket{data.length !== 1 ? 's' : ''}</h3>
+              {data.length === 1000 && (
+                <p className="text-xs text-orange-500 mt-0.5">Showing first 1,000 results — narrow your filters for more precision.</p>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <button onClick={exportToPDF} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-semibold">Export PDF</button>
+              <button onClick={exportToExcel} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-semibold">Export Excel</button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-max">
+              <thead className="bg-navy text-white sticky top-0">
+                <tr>
+                  <th className="px-3 py-3 text-left">#</th>
+                  <th className="px-3 py-3 text-left">Ticket</th>
+                  <th className="px-3 py-3 text-left">Department</th>
+                  <th className="px-3 py-3 text-left">Service</th>
+                  <th className="px-3 py-3 text-left">Parent</th>
+                  <th className="px-3 py-3 text-left">Student</th>
+                  <th className="px-3 py-3 text-left">Priority</th>
+                  <th className="px-3 py-3 text-left">Status</th>
+                  <th className="px-3 py-3 text-left">Created</th>
+                  <th className="px-3 py-3 text-right">Wait (min)</th>
+                  <th className="px-3 py-3 text-right">Service (min)</th>
+                  <th className="px-3 py-3 text-left">Served By</th>
+                  <th className="px-3 py-3 text-left">Purpose</th>
+                  <th className="px-3 py-3 text-left">Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.map((r, i) => (
+                  <tr key={r.ticket_id} className="border-b hover:bg-gray-50 align-top">
+                    <td className="px-3 py-2 text-gray-400 text-xs">{i + 1}</td>
+                    <td className="px-3 py-2 font-mono font-bold text-navy whitespace-nowrap">{r.ticket_number}</td>
+                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{r.department}</td>
+                    <td className="px-3 py-2 text-gray-500 text-xs">{r.service_type || '—'}</td>
+                    <td className="px-3 py-2 font-medium whitespace-nowrap">{r.parent_name}</td>
+                    <td className="px-3 py-2 text-gray-500">{r.student_name || '—'}</td>
+                    <td className="px-3 py-2">
+                      {r.priority !== 'regular' ? (
+                        <span className={`text-xs px-2 py-0.5 rounded capitalize ${PRIORITY_STYLE[r.priority]}`}>{r.priority}</span>
+                      ) : <span className="text-gray-300 text-xs">—</span>}
+                    </td>
+                    <td className="px-3 py-2">
+                      <span className={`text-xs px-2 py-0.5 rounded capitalize font-semibold ${STATUS_STYLE[r.status] || 'bg-gray-100 text-gray-600'}`}>
+                        {r.status.replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-gray-500 text-xs whitespace-nowrap">{fmtTime(r.created_at)}</td>
+                    <td className="px-3 py-2 text-right font-semibold">{r.wait_minutes ?? '—'}</td>
+                    <td className="px-3 py-2 text-right font-semibold text-teal">{r.service_duration ?? '—'}</td>
+                    <td className="px-3 py-2 text-gray-500 text-xs">{r.served_by || '—'}</td>
+                    <td className="px-3 py-2 text-gray-500 text-xs max-w-xs truncate" title={r.purpose}>{r.purpose || '—'}</td>
+                    <td className="px-3 py-2 text-gray-400 text-xs max-w-xs truncate" title={r.notes}>{r.notes || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {data?.length === 0 && (
+        <div className="bg-white rounded-xl shadow-sm p-12 text-center text-gray-400 text-lg">
+          No tickets found for the selected filters.
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
+
+const PAGE_TAB_MAP = {
+  daily:        'reports_daily',
+  serviceTypes: 'reports_service_types',
+  transfers:    'reports_transfers',
+  purposes:     'reports_purposes',
+  ticketLog:    'reports_ticket_log',
+};
+
+const ALL_TABS = [
+  { key: 'daily',        label: 'Daily Summary' },
+  { key: 'serviceTypes', label: 'Service Types' },
+  { key: 'transfers',    label: 'Transfers' },
+  { key: 'purposes',     label: 'Visit Purposes' },
+  { key: 'ticketLog',    label: 'Ticket Log' },
+];
 
 export default function Reports() {
   const [tab, setTab] = useState('daily');
   const navigate      = useNavigate();
   const logout        = useAuthStore(s => s.logout);
+  const user          = useAuthStore(s => s.user);
+
+  const visibleTabs = (() => {
+    const ap = user?.allowed_pages;
+    if (!ap) return ALL_TABS;
+    const hasSubKeys = Object.values(PAGE_TAB_MAP).some(k => ap.includes(k));
+    if (!hasSubKeys) return ALL_TABS;
+    return ALL_TABS.filter(t => ap.includes(PAGE_TAB_MAP[t.key]));
+  })();
+
+  useEffect(() => {
+    if (visibleTabs.length && !visibleTabs.find(t => t.key === tab)) {
+      setTab(visibleTabs[0].key);
+    }
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -407,11 +951,8 @@ export default function Reports() {
       </header>
 
       <main className="max-w-6xl mx-auto p-8">
-        <div className="flex gap-2 mb-6">
-          {[
-            { key: 'daily',        label: 'Daily Summary' },
-            { key: 'serviceTypes', label: 'Service Types' },
-          ].map(t => (
+        <div className="flex flex-wrap gap-2 mb-6">
+          {visibleTabs.map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
               className={`px-6 py-2 rounded-lg font-semibold text-sm transition-all
                 ${tab === t.key
@@ -424,6 +965,9 @@ export default function Reports() {
 
         {tab === 'daily'        && <DailySummary />}
         {tab === 'serviceTypes' && <ServiceTypeReport />}
+        {tab === 'transfers'    && <TransferReport />}
+        {tab === 'purposes'     && <PurposeReport />}
+        {tab === 'ticketLog'    && <TicketLog />}
       </main>
     </div>
   );

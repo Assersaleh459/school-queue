@@ -56,13 +56,14 @@ const createTicketTx = db.transaction((dept, category_id, parent_name, student_n
 
 exports.create = (req, res) => {
   const { department_id, category_id, parent_name, student_name, student_id, phone, purpose, priority } = req.body;
+  const cat_id = category_id ? parseInt(category_id) || null : null;
 
   try {
     const dept = db.prepare('SELECT * FROM departments WHERE department_id = ?').get(department_id);
     if (!dept) return res.status(404).json({ error: 'Department not found' });
 
     const estimated_wait = calculateWaitTime(department_id);
-    const ticket = createTicketTx(dept, category_id, parent_name, student_name, student_id, phone, purpose, priority || 'regular');
+    const ticket = createTicketTx(dept, cat_id, parent_name, student_name, student_id, phone, purpose, priority || 'regular');
 
     req.io.to(`dept_${department_id}`).emit('queue_updated');
     log(req.user?.user_id, 'TICKET_CREATED', 'ticket', ticket.ticket_id, { ticket_number: ticket.ticket_number, department: dept.name, priority: ticket.priority });
@@ -70,7 +71,7 @@ exports.create = (req, res) => {
     res.json({ success: true, ticket: { ...ticket, estimated_wait } });
   } catch (error) {
     console.error('Ticket creation error:', error);
-    res.status(500).json({ error: 'Failed to create ticket' });
+    res.status(500).json({ error: error.message || 'Failed to create ticket' });
   }
 };
 

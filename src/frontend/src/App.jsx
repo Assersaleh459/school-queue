@@ -2,6 +2,7 @@ import { useEffect, useState, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { settingsAPI, authAPI } from './lib/api';
 import useAuthStore from './store/useAuthStore';
+import Toast from './components/Toast';
 
 // ── Lazy-loaded routes ────────────────────────────────────────────────────────
 const Login        = lazy(() => import('./pages/Login'));
@@ -17,6 +18,7 @@ const Announcements = lazy(() => import('./pages/admin/Announcements'));
 const AuditLog     = lazy(() => import('./pages/admin/AuditLog'));
 const QueueControl = lazy(() => import('./pages/admin/QueueControl'));
 const Reports      = lazy(() => import('./pages/Reports'));
+const AllQueues    = lazy(() => import('./pages/AllQueues'));
 const PublicDisplay = lazy(() => import('./pages/PublicDisplay'));
 const ServerSetup  = lazy(() => import('./pages/ServerSetup'));
 
@@ -86,6 +88,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <Toast />
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/login" element={<Login />} />
@@ -125,6 +128,12 @@ export default function App() {
           <Route path="/reports" element={
             <ProtectedRoute page="reports" roles={['super_admin', 'admin']}>
               <Reports />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/all-queues" element={
+            <ProtectedRoute page="all_queues" roles={['super_admin', 'admin']}>
+              <AllQueues />
             </ProtectedRoute>
           } />
 
