@@ -215,6 +215,23 @@ router.delete('/announcements/:id', requireRole('super_admin'), (req, res) => {
 });
 
 // --- Audit Logs ---
+router.post('/reset-tickets', requireRole('super_admin'), (req, res) => {
+  try {
+    const depts = db.prepare('SELECT department_id FROM departments').all();
+    db.transaction(() => {
+      db.prepare('DELETE FROM transfers').run();
+      db.prepare('DELETE FROM tickets').run();
+    })();
+    log(req.user?.user_id, 'TICKETS_RESET', 'system', null, {});
+    depts.forEach(d => req.io.to(`dept_${d.department_id}`).emit('queue_updated'));
+    req.io.emit('queue_updated');
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Reset tickets error:', error);
+    res.status(500).json({ error: 'Failed to reset ticket data' });
+  }
+});
+
 router.get('/audit-logs', requireRole('super_admin'), (req, res) => {
   const { limit = 200, offset = 0, action, user_id } = req.query;
   let query = `

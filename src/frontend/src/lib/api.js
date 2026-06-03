@@ -86,7 +86,8 @@ export const adminAPI = {
   updateAnnouncement: (id, data) => api.put(`/admin/announcements/${id}`, data),
   deleteAnnouncement: (id) => api.delete(`/admin/announcements/${id}`),
   getAuditLogs: (params) => api.get('/admin/audit-logs', { params }),
-  searchTicket: (q) => api.get('/admin/tickets/search', { params: { q } })
+  searchTicket: (q) => api.get('/admin/tickets/search', { params: { q } }),
+  resetTickets: () => api.post('/admin/reset-tickets')
 };
 
 export const reportsAPI = {

@@ -2,11 +2,15 @@ import { useState, useEffect } from 'react';
 import { adminAPI, settingsAPI } from '../../lib/api';
 import { toast } from '../../store/useToastStore';
 import TicketReceipt from '../../components/TicketReceipt';
+import useAuthStore from '../../store/useAuthStore';
 
 export default function Settings() {
   const [settings, setSettings] = useState({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [resetConfirm, setResetConfirm] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const user = useAuthStore(s => s.user);
 
   const [reprintQ, setReprintQ]         = useState('');
   const [reprintTicket, setReprintTicket] = useState(null);
@@ -39,6 +43,19 @@ export default function Settings() {
   }, []);
 
   const set = (key, val) => setSettings(prev => ({ ...prev, [key]: val }));
+
+  const handleResetTickets = async () => {
+    setResetting(true);
+    try {
+      await adminAPI.resetTickets();
+      toast.success('All ticket data has been cleared');
+      setResetConfirm(false);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Reset failed');
+    } finally {
+      setResetting(false);
+    }
+  };
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -376,6 +393,48 @@ export default function Settings() {
           {saving ? 'Saving...' : saved ? 'Saved!' : 'Save All Settings'}
         </button>
       </form>
+
+      {user?.role === 'super_admin' && (
+        <section className="mt-8 border-2 border-red-200 rounded-xl p-6 bg-red-50">
+          <h3 className="text-lg font-bold text-red-700 mb-1">Danger Zone</h3>
+          <p className="text-sm text-red-500 mb-4">These actions are irreversible. Proceed with extreme caution.</p>
+
+          <div className="flex items-center justify-between bg-white border border-red-200 rounded-lg p-4">
+            <div>
+              <p className="font-semibold text-gray-800">Reset All Ticket Data</p>
+              <p className="text-sm text-gray-500 mt-0.5">Permanently deletes all tickets and transfer records. User accounts, departments, and settings are not affected.</p>
+            </div>
+            {!resetConfirm ? (
+              <button
+                type="button"
+                onClick={() => setResetConfirm(true)}
+                className="ml-6 px-4 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 text-sm whitespace-nowrap"
+              >
+                Reset Tickets
+              </button>
+            ) : (
+              <div className="ml-6 flex items-center gap-2">
+                <span className="text-sm text-red-700 font-semibold whitespace-nowrap">Are you sure?</span>
+                <button
+                  type="button"
+                  onClick={handleResetTickets}
+                  disabled={resetting}
+                  className="px-4 py-2 bg-red-700 text-white rounded-lg font-bold hover:bg-red-800 text-sm disabled:opacity-50"
+                >
+                  {resetting ? 'Deleting...' : 'Yes, Delete All'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setResetConfirm(false)}
+                  className="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-300"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {showReprintReceipt && reprintTicket && (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 no-print">
