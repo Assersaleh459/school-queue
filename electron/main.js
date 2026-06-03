@@ -50,9 +50,9 @@ ipcMain.on('get-local-ips',  (e)       => { e.returnValue = getLocalIPs(); });
 ipcMain.on('get-build-mode', (e)       => { e.returnValue = getBuildMode(); });
 ipcMain.on('relaunch',       ()        => { app.relaunch(); app.exit(0); });
 
-ipcMain.handle('test-server', (e, ip) => new Promise(resolve => {
+ipcMain.handle('test-server', (e, ip, port = 3000) => new Promise(resolve => {
   const req = http.get(
-    { host: ip, port: 3000, path: '/api/settings/public', timeout: 5000 },
+    { host: ip, port: parseInt(port) || 3000, path: '/api/settings/public', timeout: 5000 },
     res => {
       let data = '';
       res.on('data', d => data += d);

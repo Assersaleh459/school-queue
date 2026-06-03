@@ -6,5 +6,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getLocalIPs:  ()       => ipcRenderer.sendSync('get-local-ips'),
   getBuildMode: ()       => ipcRenderer.sendSync('get-build-mode'),
   relaunch:     ()       => ipcRenderer.send('relaunch'),
-  testServer:   (ip)     => ipcRenderer.invoke('test-server', ip)
+  testServer:   (ip, port) => ipcRenderer.invoke('test-server', ip, port)
 });

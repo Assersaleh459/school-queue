@@ -7,6 +7,7 @@ export default function ServerSetup() {
 
   const [mode, setMode]         = useState('server');
   const [serverIp, setServerIp] = useState('');
+  const [serverPort, setServerPort] = useState('3000');
   const [localIPs, setLocalIPs] = useState([]);
   const [status, setStatus]     = useState(null); // { type: 'ok'|'err'|'info', msg }
 
@@ -15,20 +16,25 @@ export default function ServerSetup() {
     const cfg = api.getConfig();
     if (cfg) {
       setMode(cfg.mode || 'server');
-      if (cfg.mode === 'client') {
-        try { setServerIp(new URL(cfg.serverUrl).hostname); } catch {}
+      if (cfg.mode === 'client' && cfg.serverUrl) {
+        try {
+          const u = new URL(cfg.serverUrl);
+          setServerIp(u.hostname);
+          setServerPort(u.port || '3000');
+        } catch {}
       }
     }
     setLocalIPs(api.getLocalIPs());
   }, []);
 
   const testConnection = async () => {
-    const ip = serverIp.trim();
+    const ip   = serverIp.trim();
+    const port = serverPort.trim() || '3000';
     if (!ip) { setStatus({ type: 'err', msg: 'Enter a server IP address first.' }); return; }
-    setStatus({ type: 'info', msg: 'Testing connection…' });
-    const result = await api.testServer(ip);
-    if (result.ok) setStatus({ type: 'ok', msg: '✓ Server is reachable!' });
-    else setStatus({ type: 'err', msg: '✗ Cannot reach server. Check the IP and make sure SchoolQ Server is running on that machine.' });
+    setStatus({ type: 'info', msg: `Testing connection to ${ip}:${port}…` });
+    const result = await api.testServer(ip, port);
+    if (result.ok) setStatus({ type: 'ok', msg: `✓ Server is reachable at ${ip}:${port}` });
+    else setStatus({ type: 'err', msg: `✗ Cannot reach server at ${ip}:${port}. Check the IP/port and make sure SchoolQ Server is running on that machine.` });
   };
 
   const save = () => {
@@ -37,7 +43,11 @@ export default function ServerSetup() {
       setStatus({ type: 'err', msg: 'Enter the server IP address.' });
       return;
     }
-    const serverUrl = mode === 'server' ? 'http://localhost:3000' : `http://${serverIp.trim()}:3000`;
+    const port = serverPort.trim() || '3000';
+    const actualPort = window.location.port || port;
+    const serverUrl = mode === 'server'
+      ? `http://localhost:${actualPort}`
+      : `http://${serverIp.trim()}:${port}`;
     api.saveConfig({ mode, serverUrl });
     setStatus({ type: 'ok', msg: 'Saved — relaunching…' });
     setTimeout(() => api.relaunch(), 800);
@@ -104,21 +114,36 @@ export default function ServerSetup() {
           </div>
         )}
 
-        {/* Client mode: enter server IP */}
+        {/* Client mode: enter server IP + port */}
         {mode === 'client' && (
-          <div className="mb-6">
-            <label className="block text-sm font-semibold text-navy mb-2">Server IP Address</label>
-            <input
-              type="text"
-              value={serverIp}
-              onChange={e => setServerIp(e.target.value)}
-              placeholder="e.g. 192.168.1.5"
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-teal text-lg"
-            />
-            <p className="text-xs text-gray-400 mt-1">Enter the IP shown on the server machine.</p>
+          <div className="mb-6 space-y-3">
+            <div>
+              <label className="block text-sm font-semibold text-navy mb-2">Server IP Address</label>
+              <input
+                type="text"
+                value={serverIp}
+                onChange={e => setServerIp(e.target.value)}
+                placeholder="e.g. 192.168.1.5"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-teal text-lg"
+              />
+              <p className="text-xs text-gray-400 mt-1">Enter the IP shown on the server machine.</p>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-navy mb-2">Port</label>
+              <input
+                type="number"
+                value={serverPort}
+                onChange={e => setServerPort(e.target.value)}
+                placeholder="3000"
+                min="1"
+                max="65535"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-teal text-lg"
+              />
+              <p className="text-xs text-gray-400 mt-1">Default is 3000 — only change if the server uses a different port.</p>
+            </div>
             <button
               onClick={testConnection}
-              className="mt-3 w-full py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-semibold text-gray-700 transition-colors"
+              className="w-full py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-semibold text-gray-700 transition-colors"
             >
               Test Connection
             </button>
