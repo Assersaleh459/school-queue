@@ -42,7 +42,6 @@ function calculateWaitTime(dept_id) {
 }
 
 exports.generateTicketNumber = generateTicketNumber;
-exports.createTicketTx = createTicketTx;
 exports.calculateWaitTime = calculateWaitTime;
 
 const createTicketTx = db.transaction((dept, category_id, parent_name, student_name, student_id, phone, purpose, priority) => {
@@ -55,6 +54,8 @@ const createTicketTx = db.transaction((dept, category_id, parent_name, student_n
   `).run(ticket_number, dept.department_id, category_id, parent_name, student_name, student_id, phone, purpose, priority);
   return db.prepare('SELECT * FROM tickets WHERE ticket_id = ?').get(result.lastInsertRowid);
 });
+
+exports.createTicketTx = createTicketTx;
 
 exports.create = (req, res) => {
   const { department_id, category_id, parent_name, student_name, student_id, phone, purpose, priority } = req.body;
