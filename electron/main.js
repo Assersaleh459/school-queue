@@ -11,6 +11,9 @@ const crypto = require('crypto');
 let mainWindow;
 const configPath = path.join(app.getPath('userData'), 'config.json');
 
+// Path to the media-key PowerShell script (written once at startup)
+let mediaKeyScript = null;
+
 // ── Config helpers ────────────────────────────────────────────────────────────
 
 function getConfig() {
@@ -49,6 +52,17 @@ ipcMain.on('save-config',    (e, cfg)  => { saveConfig(cfg); e.returnValue = tru
 ipcMain.on('get-local-ips',  (e)       => { e.returnValue = getLocalIPs(); });
 ipcMain.on('get-build-mode', (e)       => { e.returnValue = getBuildMode(); });
 ipcMain.on('relaunch',       ()        => { app.relaunch(); app.exit(0); });
+
+// Send Media Play/Pause key — pauses/resumes whatever audio app is playing
+ipcMain.handle('media-play-pause', () => new Promise(resolve => {
+  if (!mediaKeyScript) return resolve();
+  const { execFile } = require('child_process');
+  execFile('powershell',
+    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', mediaKeyScript],
+    { windowsHide: true },
+    () => resolve()
+  );
+}));
 
 ipcMain.handle('test-server', (e, ip, port = 3000) => new Promise(resolve => {
   const req = http.get(
@@ -155,6 +169,17 @@ process.on('uncaughtException', (err) => {
 app.on('ready', async () => {
   const buildMode = getBuildMode();
   const config    = getConfig();
+
+  // Write the media-key script to userData so it persists between launches
+  try {
+    mediaKeyScript = path.join(app.getPath('userData'), 'media-key.ps1');
+    fs.writeFileSync(mediaKeyScript,
+      'Add-Type -MemberDefinition \'[DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, int dwExtraInfo);\' -Name U32 -Namespace Win32 -PassThru | Out-Null\r\n' +
+      '[Win32.U32]::keybd_event(0xB3, 0, 0, 0)\r\n' +
+      '[Win32.U32]::keybd_event(0xB3, 0, 2, 0)\r\n',
+      'utf8'
+    );
+  } catch { mediaKeyScript = null; }
 
   try {
     if (buildMode === 'server') {

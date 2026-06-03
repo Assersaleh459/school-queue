@@ -94,8 +94,9 @@ export default function PublicDisplay() {
   const s = useRef({ announceLang: 'en', audioEnabled: true, ...DEFAULTS });
 
   // One AbortController per speak() call; aborting it stops audio + cancels speech
-  const abortCtrl  = useRef(null);
-  const speakQueue = useRef([]);
+  const abortCtrl   = useRef(null);
+  const speakQueue  = useRef([]);
+  const musicPaused = useRef(false); // guard: don't double-pause on rapid ticket calls
 
   // drainQueue processes the queue sequentially, respecting the abort signal
   const drainQueue = useCallback(async (signal) => {
@@ -129,7 +130,21 @@ export default function PublicDisplay() {
         : (lang === 'ar' ? s.current.callAr   : s.current.callEn);
       speakQueue.current.push({ text: applyVars(tmpl, num, deptName, lang, deptNameAr, roomNumber), lang });
     }
-    drainQueue(ctrl.signal);
+
+    const run = async () => {
+      // Pause music only once — if another ticket fires mid-announcement, skip re-pausing
+      if (!musicPaused.current) {
+        musicPaused.current = true;
+        await window.electronAPI?.mediaPlayPause?.();
+      }
+      await drainQueue(ctrl.signal);
+      // Resume only when this announcement finishes naturally (not cut off by next ticket)
+      if (!ctrl.signal.aborted) {
+        musicPaused.current = false;
+        await window.electronAPI?.mediaPlayPause?.();
+      }
+    };
+    run();
   }, [drainQueue]);
 
   const onCalled   = useCallback((data) => { fetchDisplayData(); speak(data.ticket_number, data.department_name, data.department_name_ar, false, data.department_room); }, [speak]);
