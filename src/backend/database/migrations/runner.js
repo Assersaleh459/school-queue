@@ -25,6 +25,20 @@ function runMigrations(db) {
     )
   `);
 
+  // If the table was created by an old version with INTEGER PRIMARY KEY,
+  // the text-ID insert will fail. Detect and recreate with correct schema.
+  const idType = (db.prepare('PRAGMA table_info(migrations)').all()
+    .find(c => c.name === 'id') || {}).type || '';
+  if (idType.toUpperCase() !== 'TEXT') {
+    db.exec('DROP TABLE IF EXISTS migrations');
+    db.exec(`
+      CREATE TABLE migrations (
+        id TEXT PRIMARY KEY,
+        applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+  }
+
   const applied = new Set(
     db.prepare('SELECT id FROM migrations').all().map(r => r.id)
   );
