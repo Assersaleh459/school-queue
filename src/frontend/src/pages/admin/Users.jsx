@@ -15,6 +15,7 @@ const ALL_PAGES = [
   { key: 'reports_purposes',      label: 'Visit Purposes',      sub: true },
   { key: 'reports_ticket_log',    label: 'Ticket Log',          sub: true },
   { key: 'admin',                 label: 'Admin Panel' },
+  { key: 'kiosk',                 label: 'Self-Service Kiosk' },
 ];
 const EMPTY = { username: '', password: '', full_name: '', role: 'staff', department_id: '', is_active: true, allowed_pages: null };
 
