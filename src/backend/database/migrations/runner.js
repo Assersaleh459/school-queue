@@ -32,7 +32,7 @@ function runMigrations(db) {
   for (const migration of MIGRATIONS) {
     if (applied.has(migration.id)) continue;
     try {
-      db.prepare(migration.sql).run();
+      db.exec(migration.sql);
     } catch (err) {
       if (!err.message.includes('duplicate column name')) throw err;
     }

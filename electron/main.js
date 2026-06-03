@@ -192,7 +192,7 @@ app.on('ready', async () => {
   } catch (err) {
     fatal(
       'SchoolQ — Failed to Start',
-      `SchoolQ could not start the server.\n\nError: ${err.message}\n\nTry restarting the app. If the problem persists, check that port 3000 is not in use by another program.`
+      `SchoolQ could not start the server.\n\nError: ${err.message}\n\n${err.stack || ''}\n\nTry restarting the app. If the problem persists, contact support.`
     );
   }
 });
