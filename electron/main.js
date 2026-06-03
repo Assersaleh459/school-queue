@@ -7,7 +7,6 @@ const net    = require('net');
 const os     = require('os');
 const http   = require('http');
 const crypto = require('crypto');
-const { exec } = require('child_process');
 
 let mainWindow;
 const configPath = path.join(app.getPath('userData'), 'config.json');
@@ -92,37 +91,14 @@ function waitForServer(port, host, timeoutMs = 20000) {
 
 // ── Server startup (server-mode only) ────────────────────────────────────────
 
-function isSchoolQOnPort3000() {
-  return new Promise(resolve => {
-    const req = http.get({ host: '127.0.0.1', port: 3000, path: '/api/settings/public', timeout: 2000 }, res => {
-      let data = '';
-      res.on('data', d => data += d);
-      res.on('end', () => { try { JSON.parse(data); resolve(true); } catch { resolve(false); } });
-    });
-    req.on('error', () => resolve(false));
-    req.on('timeout', () => { req.destroy(); resolve(false); });
-  });
-}
-
-function killPort3000() {
-  return new Promise(resolve => {
-    exec('powershell -Command "try { $p=(Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction Stop).OwningProcess; Stop-Process -Id $p -Force } catch {}"',
-      () => setTimeout(resolve, 600));
-  });
-}
-
 async function startLocalServer() {
-  if (await isPortListening(3000)) {
-    if (!app.isPackaged) return; // dev mode: trust the existing server
-    if (await isSchoolQOnPort3000()) return; // already our server running
-    await killPort3000(); // foreign process — kill it, then start ours
-  }
+  // Dev mode: if something is already on port 3000 assume it's the dev server
+  if (!app.isPackaged && await isPortListening(3000)) return;
 
   process.env.DB_PATH  = path.join(app.getPath('userData'), 'school-queue.db');
   process.env.PORT     = '3000';
   process.env.NODE_ENV = 'production';
 
-  // Generate a unique JWT secret per installation — stored in userData, never shipped
   const secretPath = path.join(app.getPath('userData'), 'jwt-secret.txt');
   if (!fs.existsSync(secretPath)) {
     fs.writeFileSync(secretPath, crypto.randomBytes(64).toString('hex'), 'utf8');
@@ -130,6 +106,20 @@ async function startLocalServer() {
   process.env.JWT_SECRET = fs.readFileSync(secretPath, 'utf8').trim();
 
   require(path.join(__dirname, '../src/backend/server.js'));
+}
+
+// Poll until server.js sets ACTUAL_PORT and the port is reachable
+function waitForActualServer(timeoutMs = 30000) {
+  return new Promise((resolve, reject) => {
+    const deadline = Date.now() + timeoutMs;
+    const check = () => {
+      const port = process.env.ACTUAL_PORT ? parseInt(process.env.ACTUAL_PORT) : null;
+      if (port && !isNaN(port)) { resolve(port); return; }
+      if (Date.now() > deadline) { reject(new Error('Server did not start within 30 seconds')); return; }
+      setTimeout(check, 200);
+    };
+    check();
+  });
 }
 
 // ── Window ────────────────────────────────────────────────────────────────────
@@ -169,8 +159,8 @@ app.on('ready', async () => {
   try {
     if (buildMode === 'server') {
       await startLocalServer();
-      await waitForServer(3000, '127.0.0.1', 30000);
-      createWindow('http://localhost:3000');
+      const port = await waitForActualServer(30000);
+      createWindow(`http://localhost:${port}`);
       return;
     }
 
@@ -181,8 +171,8 @@ app.on('ready', async () => {
 
     if (config.mode === 'server') {
       await startLocalServer();
-      await waitForServer(3000, '127.0.0.1', 30000);
-      createWindow('http://localhost:3000');
+      const port = await waitForActualServer(30000);
+      createWindow(`http://localhost:${port}`);
     } else {
       let url;
       try { url = new URL(config.serverUrl); }

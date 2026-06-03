@@ -116,7 +116,34 @@ if (process.env.NODE_ENV === 'production') {
 
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`✓ Server running on http://localhost:${PORT}`);
+const BASE_PORT = parseInt(process.env.PORT) || 3000;
+
+function tryListen(port) {
+  server.listen(port, () => {
+    process.env.ACTUAL_PORT = String(port);
+    if (port !== BASE_PORT) {
+      console.warn(`Port ${BASE_PORT} was in use — bound to http://localhost:${port} instead`);
+    } else {
+      console.log(`✓ Server running on http://localhost:${port}`);
+    }
+  });
+}
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    const taken = err.port;
+    const next  = taken + 1;
+    if (next > BASE_PORT + 10) {
+      console.error(`Could not find a free port in range ${BASE_PORT}–${BASE_PORT + 10}. Giving up.`);
+      process.exit(1);
+    }
+    console.warn(`Port ${taken} is already in use — trying ${next}…`);
+    server.close();
+    tryListen(next);
+  } else {
+    console.error('Server error:', err);
+    process.exit(1);
+  }
 });
+
+tryListen(BASE_PORT);
