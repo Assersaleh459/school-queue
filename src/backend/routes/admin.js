@@ -214,6 +214,42 @@ router.delete('/announcements/:id', requireRole('super_admin'), (req, res) => {
   res.json({ success: true });
 });
 
+// --- Export / Import ---
+router.get('/export/users', requireRole('super_admin'), (req, res) => {
+  const users = db.prepare(
+    `SELECT username, password_hash, full_name, role, department_id, is_active, allowed_pages
+     FROM users ORDER BY user_id`
+  ).all();
+  log(req.user?.user_id, 'USERS_EXPORTED', 'user', null, { count: users.length });
+  res.json(users);
+});
+
+router.post('/import/users', requireRole('super_admin'), async (req, res) => {
+  const { users } = req.body;
+  if (!Array.isArray(users) || users.length === 0)
+    return res.status(400).json({ error: 'No users provided' });
+
+  let created = 0, skipped = 0;
+  for (const u of users) {
+    const { username, password_hash, password, full_name, role, department_id, is_active, allowed_pages } = u;
+    if (!username || !full_name || !role) { skipped++; continue; }
+    const exists = db.prepare('SELECT 1 FROM users WHERE username = ?').get(username);
+    if (exists) { skipped++; continue; }
+    let hash = password_hash;
+    if (!hash && password) hash = await bcrypt.hash(password, 10);
+    if (!hash) { skipped++; continue; }
+    try {
+      db.prepare(
+        `INSERT INTO users (username, password_hash, full_name, role, department_id, is_active, allowed_pages)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).run(username, hash, full_name, role, department_id || null, is_active ? 1 : 0, allowed_pages || null);
+      created++;
+    } catch { skipped++; }
+  }
+  log(req.user?.user_id, 'USERS_IMPORTED', 'user', null, { created, skipped });
+  res.json({ success: true, created, skipped });
+});
+
 // --- Audit Logs ---
 router.post('/reset-tickets', requireRole('super_admin'), (req, res) => {
   try {

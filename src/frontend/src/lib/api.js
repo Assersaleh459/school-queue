@@ -87,7 +87,9 @@ export const adminAPI = {
   deleteAnnouncement: (id) => api.delete(`/admin/announcements/${id}`),
   getAuditLogs: (params) => api.get('/admin/audit-logs', { params }),
   searchTicket: (q) => api.get('/admin/tickets/search', { params: { q } }),
-  resetTickets: () => api.post('/admin/reset-tickets')
+  resetTickets: () => api.post('/admin/reset-tickets'),
+  exportUsers: () => api.get('/admin/export/users'),
+  importUsers: (users) => api.post('/admin/import/users', { users })
 };
 
 export const kioskAPI = {

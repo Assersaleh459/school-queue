@@ -7,7 +7,7 @@ src/frontend/dist/
 dist/
 
 # Database
-database/
+/database/
 *.db
 *.db-shm
 *.db-wal

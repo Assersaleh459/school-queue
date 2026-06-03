@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { adminAPI, settingsAPI } from '../../lib/api';
 import { toast } from '../../store/useToastStore';
 import TicketReceipt from '../../components/TicketReceipt';
@@ -11,6 +11,7 @@ export default function Settings() {
   const [resetConfirm, setResetConfirm] = useState(false);
   const [resetting, setResetting] = useState(false);
   const user = useAuthStore(s => s.user);
+  const settingsImportRef = useRef();
 
   const [reprintQ, setReprintQ]         = useState('');
   const [reprintTicket, setReprintTicket] = useState(null);
@@ -71,9 +72,51 @@ export default function Settings() {
     }
   };
 
+  const handleExportSettings = async () => {
+    try {
+      const res = await adminAPI.getSettings();
+      const obj = {};
+      res.data.forEach(s => { obj[s.setting_key] = s.setting_value; });
+      const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `schoolq-settings-${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch { toast.error('Export failed'); }
+  };
+
+  const handleImportSettings = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    try {
+      const text = await file.text();
+      const imported = JSON.parse(text);
+      await adminAPI.saveSettings(imported);
+      const obj = {};
+      Object.entries(imported).forEach(([k, v]) => { obj[k] = v; });
+      setSettings(prev => ({ ...prev, ...obj }));
+      toast.success('Settings imported successfully');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Import failed — check file format');
+    }
+  };
+
   return (
     <div className="max-w-3xl">
-      <h2 className="text-2xl font-bold text-navy mb-6">System Settings</h2>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-navy">System Settings</h2>
+        <div className="flex gap-2">
+          <button onClick={handleExportSettings} className="px-4 py-2 border border-navy text-navy rounded-lg hover:bg-navy hover:text-white text-sm font-semibold transition-colors">
+            Export Settings
+          </button>
+          <button onClick={() => settingsImportRef.current.click()} className="px-4 py-2 border border-navy text-navy rounded-lg hover:bg-navy hover:text-white text-sm font-semibold transition-colors">
+            Import Settings
+          </button>
+          <input ref={settingsImportRef} type="file" accept=".json" className="hidden" onChange={handleImportSettings} />
+        </div>
+      </div>
 
       {/* Reprint Ticket */}
       <section className="bg-white rounded-xl shadow-sm p-6 mb-6">

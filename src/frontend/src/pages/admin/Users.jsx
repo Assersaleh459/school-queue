@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { adminAPI } from '../../lib/api';
 import { toast } from '../../store/useToastStore';
 
@@ -34,6 +34,7 @@ export default function Users() {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const importRef = useRef();
 
   useEffect(() => {
     loadUsers();
@@ -133,16 +134,49 @@ export default function Users() {
 
   const deptName = (id) => departments.find(d => d.department_id === id)?.name || '—';
 
+  const handleExportUsers = async () => {
+    try {
+      const res = await adminAPI.exportUsers();
+      const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `schoolq-users-${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch { toast.error('Export failed'); }
+  };
+
+  const handleImportUsers = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    try {
+      const text = await file.text();
+      const users = JSON.parse(text);
+      const res = await adminAPI.importUsers(Array.isArray(users) ? users : users.users || []);
+      toast.success(`Imported ${res.data.created} users, skipped ${res.data.skipped}`);
+      loadUsers();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Import failed — check file format');
+    }
+  };
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-navy">Users ({users.length})</h2>
-        <button
-          onClick={openCreate}
-          className="bg-teal text-white px-5 py-2 rounded-lg hover:bg-opacity-90 font-semibold"
-        >
-          + Add User
-        </button>
+        <div className="flex gap-2">
+          <button onClick={handleExportUsers} className="px-4 py-2 border border-navy text-navy rounded-lg hover:bg-navy hover:text-white text-sm font-semibold transition-colors">
+            Export
+          </button>
+          <button onClick={() => importRef.current.click()} className="px-4 py-2 border border-navy text-navy rounded-lg hover:bg-navy hover:text-white text-sm font-semibold transition-colors">
+            Import
+          </button>
+          <input ref={importRef} type="file" accept=".json" className="hidden" onChange={handleImportUsers} />
+          <button onClick={openCreate} className="bg-teal text-white px-5 py-2 rounded-lg hover:bg-opacity-90 font-semibold">
+            + Add User
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -198,8 +232,8 @@ export default function Users() {
       </div>
 
       {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl p-8 w-full max-w-md">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl p-8 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold mb-6">{editing ? 'Edit User' : 'Create User'}</h2>
             <form onSubmit={handleSave} className="space-y-4">
               <div>

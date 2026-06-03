@@ -1,5 +1,5 @@
 {"name": "school-queue",
-  "version": "1.5.30",
+  "version": "1.5.31",
   "description": "Queue management system for Al-Noor International School",
   "author": "Vyra Systems <asserhegazy@vyra-systems.com>",
   "main": "electron/main.js",
