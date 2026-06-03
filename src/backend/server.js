@@ -62,6 +62,7 @@ const displayRoutes = require('./routes/display');
 const announcementRoutes = require('./routes/announcements');
 const adminRoutes = require('./routes/admin');
 const reportRoutes = require('./routes/reports');
+const kioskRoutes = require('./routes/kiosk');
 
 const socketHandlers = require('./socket/handlers');
 socketHandlers(io);
@@ -81,6 +82,7 @@ app.use('/api/display', displayRoutes);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/admin', mutationLimiter, adminRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/kiosk', mutationLimiter, kioskRoutes);
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 

@@ -21,6 +21,7 @@ const Reports      = lazy(() => import('./pages/Reports'));
 const AllQueues    = lazy(() => import('./pages/AllQueues'));
 const PublicDisplay = lazy(() => import('./pages/PublicDisplay'));
 const ServerSetup  = lazy(() => import('./pages/ServerSetup'));
+const Kiosk        = lazy(() => import('./pages/Kiosk'));
 
 // ── Loading fallback ──────────────────────────────────────────────────────────
 function PageLoader() {
@@ -144,6 +145,7 @@ export default function App() {
           } />
 
           <Route path="/display" element={<PublicDisplay />} />
+          <Route path="/kiosk" element={<Kiosk />} />
           <Route path="/" element={<RootRedirect />} />
         </Routes>
       </Suspense>

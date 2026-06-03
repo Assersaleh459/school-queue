@@ -59,6 +59,15 @@ const TILES = [
     color: '#059669',
     roles: ['super_admin', 'admin', 'staff'],
     icon: '📺'
+  },
+  {
+    label: 'Self-Service Kiosk',
+    description: 'Touch panel for parents to get tickets',
+    path: '/kiosk',
+    page: null,
+    color: '#d97706',
+    roles: ['super_admin', 'admin'],
+    icon: '🖥️'
   }
 ];
 

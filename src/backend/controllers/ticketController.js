@@ -42,6 +42,8 @@ function calculateWaitTime(dept_id) {
 }
 
 exports.generateTicketNumber = generateTicketNumber;
+exports.createTicketTx = createTicketTx;
+exports.calculateWaitTime = calculateWaitTime;
 
 const createTicketTx = db.transaction((dept, category_id, parent_name, student_name, student_id, phone, purpose, priority) => {
   const ticket_number = generateTicketNumber(dept.code, new Date(), priority);

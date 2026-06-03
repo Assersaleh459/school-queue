@@ -90,6 +90,10 @@ export const adminAPI = {
   resetTickets: () => api.post('/admin/reset-tickets')
 };
 
+export const kioskAPI = {
+  createTicket: (data) => api.post('/kiosk/ticket', data),
+};
+
 export const reportsAPI = {
   getDaily:         (date)   => api.get('/reports/daily', { params: { date } }),
   getServiceTypes:  (params) => api.get('/reports/service-types', { params }),
