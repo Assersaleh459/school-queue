@@ -185,34 +185,8 @@ router.delete('/departments/:id/categories/:catId', requireRole('super_admin'), 
   }
 });
 
-// --- Announcements ---
-router.get('/announcements', (req, res) => {
-  const rows = db.prepare('SELECT * FROM announcements ORDER BY display_order').all();
-  res.json(rows);
-});
-
-router.post('/announcements', requireRole('super_admin'), rules.createAnnouncement, checkValidation, (req, res) => {
-  const { message_text, message_text_ar, speak_language, display_order, is_active } = req.body;
-  const result = db.prepare(
-    'INSERT INTO announcements (message_text, message_text_ar, speak_language, display_order, is_active) VALUES (?, ?, ?, ?, ?)'
-  ).run(message_text, message_text_ar || null, speak_language || 'en', display_order || 99, is_active ? 1 : 0);
-  log(req.user?.user_id, 'ANNOUNCEMENT_CREATED', 'announcement', result.lastInsertRowid, { message_text });
-  res.json({ success: true, announcement_id: result.lastInsertRowid });
-});
-
-router.put('/announcements/:id', requireRole('super_admin'), rules.updateAnnouncement, checkValidation, (req, res) => {
-  const { message_text, message_text_ar, speak_language, display_order, is_active } = req.body;
-  db.prepare(
-    'UPDATE announcements SET message_text=?, message_text_ar=?, speak_language=?, display_order=?, is_active=? WHERE announcement_id=?'
-  ).run(message_text, message_text_ar || null, speak_language || 'en', display_order, is_active ? 1 : 0, req.params.id);
-  res.json({ success: true });
-});
-
-router.delete('/announcements/:id', requireRole('super_admin'), (req, res) => {
-  db.prepare('DELETE FROM announcements WHERE announcement_id = ?').run(req.params.id);
-  log(req.user?.user_id, 'ANNOUNCEMENT_DELETED', 'announcement', parseInt(req.params.id));
-  res.json({ success: true });
-});
+// Announcement management moved to routes/announcements.js (screen-access gated,
+// so users granted the 'announcements' screen can manage them without full admin).
 
 // --- Export / Import ---
 router.get('/export/users', requireRole('super_admin'), (req, res) => {

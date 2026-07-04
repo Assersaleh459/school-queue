@@ -287,7 +287,7 @@ export default function Settings() {
                 ].map(opt => (
                   <label
                     key={opt.value}
-                    className={`flex-1 flex items-center justify-center gap-2 border-2 rounded-xl py-3 cursor-pointer transition-all font-semibold text-sm
+                    className={`relative flex-1 flex items-center justify-center gap-2 border-2 rounded-xl py-3 cursor-pointer transition-all font-semibold text-sm
                       ${(settings.announcement_language || 'en') === opt.value
                         ? 'border-teal bg-teal bg-opacity-10 text-navy'
                         : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}

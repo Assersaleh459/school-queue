@@ -1,12 +1,38 @@
 const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
-Menu.setApplicationMenu(null);
-app.setName('SchoolQ');
 const path   = require('path');
 const fs     = require('fs');
 const net    = require('net');
 const os     = require('os');
 const http   = require('http');
 const crypto = require('crypto');
+
+Menu.setApplicationMenu(null);
+
+// Server and Staff share one codebase. Pick the app name from the bundled build
+// marker so each build gets its own data dir and the two can run side by side on
+// one machine (Server keeps the 'SchoolQ' dir + its DB).
+const buildRole = getBuildMode(); // 'server' | 'client' | null (dev)
+app.setName(buildRole === 'client' ? 'SchoolQ Staff' : 'SchoolQ');
+
+// Display screen plays call/recall announcements without a click, so allow
+// audio to autoplay without a user gesture.
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+
+// Stop Chromium from capturing the hardware Media Play/Pause key for its own
+// TTS audio. Otherwise the key we send to pause background music is grabbed by
+// Chromium (pausing our announcement) instead of reaching the music app. With
+// this disabled, the key flows through to Spotify/YouTube/etc. and our TTS —
+// which no longer registers a media session — plays unaffected.
+app.commandLine.appendSwitch('disable-features', 'HardwareMediaKeyHandling,MediaSessionService');
+
+// Single-instance lock applies to the SERVER build only. Two Server copies would
+// each start a server on a different port (3000, 3001, …) sharing one database —
+// polling still works, but live socket events (ticket calls/recalls) only reach
+// the instance that emitted them, breaking real-time announcements. A second
+// Server launch focuses the existing window. Staff (client) builds are exempt —
+// multiple staff windows on one machine are fine (they just connect to the server).
+const gotInstanceLock = buildRole === 'client' ? true : app.requestSingleInstanceLock();
+if (!gotInstanceLock) app.quit();
 
 let mainWindow;
 const configPath = path.join(app.getPath('userData'), 'config.json');
@@ -145,7 +171,11 @@ function createWindow(url) {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js')
+      preload: path.join(__dirname, 'preload.js'),
+      // Display plays call/recall announcements from socket events (no click),
+      // so audio must be allowed to start without a user gesture. The per-window
+      // setting is authoritative — the command-line switch alone is overridden here.
+      autoplayPolicy: 'no-user-gesture-required'
     },
     show: false,
   });
@@ -166,7 +196,16 @@ process.on('uncaughtException', (err) => {
   fatal('SchoolQ — Startup Error', `An unexpected error occurred:\n\n${err.message}\n\n${err.stack || ''}`);
 });
 
+// A second launch focuses the existing window instead of starting a new server.
+app.on('second-instance', () => {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+  }
+});
+
 app.on('ready', async () => {
+  if (!gotInstanceLock) return; // second instance is quitting — do not start a server
   const buildMode = getBuildMode();
   const config    = getConfig();
 
