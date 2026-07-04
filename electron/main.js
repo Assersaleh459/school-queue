@@ -1,10 +1,11 @@
-const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, shell } = require('electron');
 const path   = require('path');
 const fs     = require('fs');
 const net    = require('net');
 const os     = require('os');
 const http   = require('http');
 const crypto = require('crypto');
+const license = require('./license');
 
 Menu.setApplicationMenu(null);
 
@@ -79,6 +80,12 @@ ipcMain.on('get-local-ips',  (e)       => { e.returnValue = getLocalIPs(); });
 ipcMain.on('get-build-mode', (e)       => { e.returnValue = getBuildMode(); });
 ipcMain.on('relaunch',       ()        => { app.relaunch(); app.exit(0); });
 
+// License activation (Server build)
+ipcMain.on('license-status', (e) => {
+  e.returnValue = { ...license.checkActivated(app.getPath('userData')), machineId: license.machineId() };
+});
+ipcMain.handle('activate-license', (e, key) => license.activate(app.getPath('userData'), key));
+
 // Send Media Play/Pause key — pauses/resumes whatever audio app is playing
 ipcMain.handle('media-play-pause', () => new Promise(resolve => {
   if (!mediaKeyScript) return resolve();
@@ -89,6 +96,49 @@ ipcMain.handle('media-play-pause', () => new Promise(resolve => {
     () => resolve()
   );
 }));
+
+// ── Backups / Restore ─────────────────────────────────────────────────────────
+
+function backupsDir() {
+  const dir = path.join(app.getPath('userData'), 'backups');
+  try { if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true }); } catch {}
+  return dir;
+}
+
+ipcMain.handle('open-backups', () => shell.openPath(backupsDir()));
+
+// Pick a .db backup, stage it, and relaunch. The staged file is swapped in on the
+// next startup (in startLocalServer) before the database is opened.
+ipcMain.handle('restore-database', async () => {
+  const { canceled, filePaths } = await dialog.showOpenDialog({
+    title: 'Restore SchoolQ backup',
+    defaultPath: backupsDir(),
+    filters: [{ name: 'SchoolQ Backup', extensions: ['db'] }],
+    properties: ['openFile'],
+  });
+  if (canceled || !filePaths[0]) return { ok: false };
+
+  const confirm = dialog.showMessageBoxSync({
+    type: 'warning',
+    buttons: ['Restore & Restart', 'Cancel'],
+    defaultId: 1,
+    cancelId: 1,
+    title: 'Restore Database',
+    message: 'Replace the current data with this backup?',
+    detail: 'The app will restart. Current data will be overwritten by the selected backup.',
+  });
+  if (confirm !== 0) return { ok: false };
+
+  try {
+    fs.copyFileSync(filePaths[0], path.join(app.getPath('userData'), 'restore-pending.db'));
+    app.relaunch();
+    app.exit(0);
+    return { ok: true };
+  } catch (err) {
+    dialog.showErrorBox('Restore Failed', err.message);
+    return { ok: false };
+  }
+});
 
 ipcMain.handle('test-server', (e, ip, port = 3000) => new Promise(resolve => {
   const req = http.get(
@@ -135,7 +185,24 @@ async function startLocalServer() {
   // Dev mode: if something is already on port 3000 assume it's the dev server
   if (!app.isPackaged && await isPortListening(3000)) return;
 
-  process.env.DB_PATH  = path.join(app.getPath('userData'), 'school-queue.db');
+  const dbPath = path.join(app.getPath('userData'), 'school-queue.db');
+
+  // If a restore was staged, swap it in before the database is opened.
+  const pending = path.join(app.getPath('userData'), 'restore-pending.db');
+  if (fs.existsSync(pending)) {
+    try {
+      for (const ext of ['-wal', '-shm']) {
+        const f = dbPath + ext;
+        if (fs.existsSync(f)) fs.unlinkSync(f);
+      }
+      fs.copyFileSync(pending, dbPath);
+      fs.unlinkSync(pending);
+    } catch (err) {
+      dialog.showErrorBox('Restore Failed', `Could not restore the backup:\n\n${err.message}`);
+    }
+  }
+
+  process.env.DB_PATH  = dbPath;
   process.env.PORT     = '3000';
   process.env.NODE_ENV = 'production';
 
@@ -208,6 +275,13 @@ app.on('ready', async () => {
   if (!gotInstanceLock) return; // second instance is quitting — do not start a server
   const buildMode = getBuildMode();
   const config    = getConfig();
+
+  // License gate — the Server build must be activated before it runs. The Staff
+  // (client) build and dev mode are exempt.
+  if (app.isPackaged && buildMode === 'server' && !license.checkActivated(app.getPath('userData')).ok) {
+    createWindow(`file://${path.join(__dirname, 'activation.html')}`);
+    return;
+  }
 
   // Write the media-key script to userData so it persists between launches
   try {

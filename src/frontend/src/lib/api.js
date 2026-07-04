@@ -88,6 +88,9 @@ export const adminAPI = {
   getAuditLogs: (params) => api.get('/admin/audit-logs', { params }),
   searchTicket: (q) => api.get('/admin/tickets/search', { params: { q } }),
   resetTickets: () => api.post('/admin/reset-tickets'),
+  archiveTickets: () => api.post('/admin/archive-tickets'),
+  backupNow: () => api.post('/admin/backup'),
+  listBackups: () => api.get('/admin/backups'),
   exportUsers: () => api.get('/admin/export/users'),
   importUsers: (users) => api.post('/admin/import/users', { users })
 };

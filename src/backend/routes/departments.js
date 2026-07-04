@@ -21,7 +21,7 @@ router.get('/:id/queue', (req, res) => {
       c.name as category_name
     FROM tickets t
     LEFT JOIN service_categories c ON t.category_id = c.category_id
-    WHERE t.department_id = ? AND t.status = 'waiting'
+    WHERE t.department_id = ? AND t.status = 'waiting' AND t.archived = 0
     ORDER BY
       CASE t.priority
         WHEN 'urgent' THEN 1
@@ -37,11 +37,11 @@ router.get('/:id/queue', (req, res) => {
 
 router.get('/:id/stats', (req, res) => {
   const waiting_count = db.prepare(
-    "SELECT COUNT(*) as count FROM tickets WHERE department_id = ? AND status = 'waiting'"
+    "SELECT COUNT(*) as count FROM tickets WHERE department_id = ? AND status = 'waiting' AND archived = 0"
   ).get(req.params.id).count;
 
   const serving_count = db.prepare(
-    "SELECT COUNT(*) as count FROM tickets WHERE department_id = ? AND status IN ('called', 'serving')"
+    "SELECT COUNT(*) as count FROM tickets WHERE department_id = ? AND status IN ('called', 'serving') AND archived = 0"
   ).get(req.params.id).count;
 
   const served_today = db.prepare(

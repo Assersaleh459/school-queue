@@ -242,6 +242,45 @@ router.post('/reset-tickets', requireRole('super_admin'), (req, res) => {
   }
 });
 
+// Resets the queue for a new day WITHOUT deleting anything: archives all current
+// tickets so they leave the live queues/display but stay in the DB for reports.
+router.post('/archive-tickets', requireRole('super_admin'), (req, res) => {
+  try {
+    const depts = db.prepare('SELECT department_id FROM departments').all();
+    const result = db.prepare('UPDATE tickets SET archived = 1 WHERE archived = 0').run();
+    log(req.user?.user_id, 'TICKETS_ARCHIVED', 'system', null, { archived: result.changes });
+    depts.forEach(d => req.io.to(`dept_${d.department_id}`).emit('queue_updated'));
+    req.io.emit('queue_updated');
+    res.json({ success: true, archived: result.changes });
+  } catch (error) {
+    console.error('Archive tickets error:', error);
+    res.status(500).json({ error: 'Failed to reset queue' });
+  }
+});
+
+// --- Backups ---
+const backup = require('../database/backup');
+
+router.post('/backup', requireRole('super_admin'), async (req, res) => {
+  try {
+    const dest = await backup.runBackup(db, 'manual');
+    backup.prune(db, 14);
+    log(req.user?.user_id, 'BACKUP_CREATED', 'system', null, { file: require('path').basename(dest) });
+    res.json({ success: true, file: require('path').basename(dest) });
+  } catch (error) {
+    console.error('Backup error:', error);
+    res.status(500).json({ error: 'Backup failed' });
+  }
+});
+
+router.get('/backups', requireRole('super_admin'), (req, res) => {
+  try {
+    res.json(backup.listBackups(db));
+  } catch {
+    res.status(500).json({ error: 'Failed to list backups' });
+  }
+});
+
 router.get('/audit-logs', requireRole('super_admin'), (req, res) => {
   const { limit = 200, offset = 0, action, user_id } = req.query;
   let query = `

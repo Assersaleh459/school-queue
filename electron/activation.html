@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'" />
+<title>SchoolQ — Activation</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f0f4f8; display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; color: #19224A;
+  }
+  .card {
+    background: #fff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+    padding: 48px 40px; width: 480px;
+  }
+  .logo { font-size: 28px; font-weight: 800; color: #19224A; }
+  .logo span { color: #5FAEB6; }
+  .subtitle { font-size: 13px; color: #888; margin-top: 4px; margin-bottom: 28px; }
+  h2 { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+  p.lead { font-size: 13px; color: #6b7280; margin-bottom: 20px; line-height: 1.5; }
+  label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  textarea {
+    width: 100%; padding: 12px 14px; border: 1.5px solid #e5e7eb; border-radius: 8px;
+    font-size: 12px; outline: none; font-family: ui-monospace, monospace;
+    resize: vertical; min-height: 96px; transition: border-color 0.15s;
+  }
+  textarea:focus { border-color: #5FAEB6; }
+  #status { margin: 14px 0; font-size: 13px; font-weight: 600; text-align: center; min-height: 20px; }
+  .ok { color: #059669; } .err { color: #dc2626; } .info { color: #2563eb; }
+  .btn {
+    width: 100%; padding: 14px; border: none; border-radius: 10px;
+    font-size: 15px; font-weight: 700; cursor: pointer; background: #5FAEB6; color: #fff;
+  }
+  .btn:hover { opacity: 0.88; }
+  .mid { font-size: 11px; color: #9ca3af; margin-top: 16px; text-align: center; word-break: break-all; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">School<span>Q</span></div>
+  <div class="subtitle">Software Activation</div>
+
+  <h2>Activate this installation</h2>
+  <p class="lead">Enter the license key provided with your purchase. Activation is a one-time step and works fully offline.</p>
+
+  <label for="key">License Key</label>
+  <textarea id="key" placeholder="Paste your license key here…"></textarea>
+
+  <div id="status"></div>
+  <button class="btn" onclick="activate()">Activate</button>
+
+  <div class="mid" id="machine"></div>
+</div>
+
+<script>
+  function setStatus(msg, cls) {
+    const el = document.getElementById('status');
+    el.textContent = msg; el.className = cls || '';
+  }
+
+  window.addEventListener('DOMContentLoaded', () => {
+    const st = window.electronAPI.licenseStatus();
+    if (st && st.machineId) {
+      document.getElementById('machine').textContent = 'Machine ID: ' + st.machineId;
+    }
+  });
+
+  async function activate() {
+    const key = document.getElementById('key').value.trim();
+    if (!key) { setStatus('Please paste your license key.', 'err'); return; }
+    setStatus('Verifying…', 'info');
+    const res = await window.electronAPI.activateLicense(key);
+    if (res && res.valid) {
+      setStatus('✓ Activated for ' + (res.school || 'your school') + '. Launching…', 'ok');
+      setTimeout(() => window.electronAPI.relaunch(), 900);
+    } else {
+      setStatus('✗ ' + (res && res.reason ? res.reason : 'Activation failed'), 'err');
+    }
+  }
+</script>
+</body>
+</html>

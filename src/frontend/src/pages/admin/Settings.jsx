@@ -10,7 +10,30 @@ export default function Settings() {
   const [saved, setSaved] = useState(false);
   const [resetConfirm, setResetConfirm] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [newDayConfirm, setNewDayConfirm] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const [backups, setBackups] = useState([]);
+  const [backingUp, setBackingUp] = useState(false);
   const user = useAuthStore(s => s.user);
+
+  const loadBackups = () => adminAPI.listBackups().then(r => setBackups(r.data)).catch(() => {});
+
+  useEffect(() => {
+    if (user?.role === 'super_admin') loadBackups();
+  }, [user]);
+
+  const handleBackupNow = async () => {
+    setBackingUp(true);
+    try {
+      const res = await adminAPI.backupNow();
+      toast.success(`Backup created: ${res.data.file}`);
+      loadBackups();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Backup failed');
+    } finally {
+      setBackingUp(false);
+    }
+  };
   const settingsImportRef = useRef();
 
   const [reprintQ, setReprintQ]         = useState('');
@@ -44,6 +67,19 @@ export default function Settings() {
   }, []);
 
   const set = (key, val) => setSettings(prev => ({ ...prev, [key]: val }));
+
+  const handleNewDay = async () => {
+    setArchiving(true);
+    try {
+      const res = await adminAPI.archiveTickets();
+      toast.success(`New day started — ${res.data.archived} ticket(s) cleared from queues. Reports kept.`);
+      setNewDayConfirm(false);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to start new day');
+    } finally {
+      setArchiving(false);
+    }
+  };
 
   const handleResetTickets = async () => {
     setResetting(true);
@@ -436,6 +472,98 @@ export default function Settings() {
           {saving ? 'Saving...' : saved ? 'Saved!' : 'Save All Settings'}
         </button>
       </form>
+
+      {user?.role === 'super_admin' && (
+        <section className="mt-8 border-2 border-emerald-200 rounded-xl p-6 bg-emerald-50">
+          <h3 className="text-lg font-bold text-emerald-700 mb-1">Backups</h3>
+          <p className="text-sm text-emerald-600 mb-4">The database is backed up automatically every day (last 14 kept). You can also back up or restore manually.</p>
+
+          <div className="bg-white border border-emerald-200 rounded-lg p-4">
+            <div className="flex flex-wrap gap-2 mb-4">
+              <button
+                type="button"
+                onClick={handleBackupNow}
+                disabled={backingUp}
+                className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 text-sm disabled:opacity-50"
+              >
+                {backingUp ? 'Backing up…' : 'Backup Now'}
+              </button>
+              {window.electronAPI && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => window.electronAPI.openBackups()}
+                    className="px-4 py-2 border border-emerald-300 text-emerald-700 rounded-lg font-semibold hover:bg-emerald-50 text-sm"
+                  >
+                    Open Backups Folder
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => window.electronAPI.restoreDatabase()}
+                    className="px-4 py-2 border border-amber-300 text-amber-700 rounded-lg font-semibold hover:bg-amber-50 text-sm"
+                  >
+                    Restore from Backup…
+                  </button>
+                </>
+              )}
+            </div>
+            {backups.length > 0 ? (
+              <div className="max-h-40 overflow-auto border-t border-gray-100 pt-2">
+                {backups.slice(0, 10).map(b => (
+                  <div key={b.file} className="flex justify-between text-xs text-gray-500 py-1 font-mono">
+                    <span className="truncate">{b.file}</span>
+                    <span className="ml-3 whitespace-nowrap">{(b.size / 1024).toFixed(0)} KB · {new Date(b.created).toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400">No backups yet — the first automatic backup runs shortly after startup.</p>
+            )}
+          </div>
+        </section>
+      )}
+
+      {user?.role === 'super_admin' && (
+        <section className="mt-8 border-2 border-blue-200 rounded-xl p-6 bg-blue-50">
+          <h3 className="text-lg font-bold text-blue-700 mb-1">Start a New Day</h3>
+          <p className="text-sm text-blue-500 mb-4">Clears every queue for a fresh start. Nothing is deleted — reports keep all history.</p>
+
+          <div className="flex items-center justify-between bg-white border border-blue-200 rounded-lg p-4">
+            <div>
+              <p className="font-semibold text-gray-800">Reset Queues for New Day</p>
+              <p className="text-sm text-gray-500 mt-0.5">Removes all current tickets from the live queues and display. They stay in the database, so Reports are completely unaffected. Ticket numbers restart from 001 on the new date.</p>
+            </div>
+            {!newDayConfirm ? (
+              <button
+                type="button"
+                onClick={() => setNewDayConfirm(true)}
+                className="ml-6 px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 text-sm whitespace-nowrap"
+              >
+                Reset for New Day
+              </button>
+            ) : (
+              <div className="ml-6 flex items-center gap-2">
+                <span className="text-sm text-blue-700 font-semibold whitespace-nowrap">Start a new day?</span>
+                <button
+                  type="button"
+                  onClick={handleNewDay}
+                  disabled={archiving}
+                  className="px-4 py-2 bg-blue-700 text-white rounded-lg font-bold hover:bg-blue-800 text-sm disabled:opacity-50"
+                >
+                  {archiving ? 'Resetting...' : 'Yes, New Day'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNewDayConfirm(false)}
+                  className="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-300"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {user?.role === 'super_admin' && (
         <section className="mt-8 border-2 border-red-200 rounded-xl p-6 bg-red-50">

@@ -28,3 +28,6 @@ Thumbs.db
 
 # Claude memory (project-local, not needed in repo)
 _claude_memory/
+
+# License signing keys — private key must NEVER be committed
+.keys/

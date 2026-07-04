@@ -7,5 +7,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getBuildMode: ()       => ipcRenderer.sendSync('get-build-mode'),
   relaunch:     ()       => ipcRenderer.send('relaunch'),
   testServer:      (ip, port) => ipcRenderer.invoke('test-server', ip, port),
-  mediaPlayPause:  ()         => ipcRenderer.invoke('media-play-pause')
+  mediaPlayPause:  ()         => ipcRenderer.invoke('media-play-pause'),
+  openBackups:     ()         => ipcRenderer.invoke('open-backups'),
+  restoreDatabase: ()         => ipcRenderer.invoke('restore-database'),
+  licenseStatus:   ()         => ipcRenderer.sendSync('license-status'),
+  activateLicense: (key)      => ipcRenderer.invoke('activate-license', key)
 });

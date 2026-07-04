@@ -16,7 +16,7 @@ router.get('/all', authMiddleware, (req, res) => {
       SELECT t.*, c.name as category_name
       FROM tickets t
       LEFT JOIN service_categories c ON t.category_id = c.category_id
-      WHERE t.department_id = ? AND t.status = 'called'
+      WHERE t.department_id = ? AND t.status = 'called' AND t.archived = 0
       ORDER BY t.called_at DESC LIMIT 1
     `).get(dept.department_id) || null;
 
@@ -24,7 +24,7 @@ router.get('/all', authMiddleware, (req, res) => {
       SELECT t.*, c.name as category_name
       FROM tickets t
       LEFT JOIN service_categories c ON t.category_id = c.category_id
-      WHERE t.department_id = ? AND t.status = 'waiting'
+      WHERE t.department_id = ? AND t.status = 'waiting' AND t.archived = 0
       ORDER BY
         CASE t.priority WHEN 'urgent' THEN 1 WHEN 'elderly' THEN 2 WHEN 'vip' THEN 3 ELSE 4 END,
         t.created_at ASC
@@ -46,7 +46,7 @@ router.get('/departments/:dept_id/current', authMiddleware, (req, res) => {
     SELECT t.*, c.name as category_name
     FROM tickets t
     LEFT JOIN service_categories c ON t.category_id = c.category_id
-    WHERE t.department_id = ? AND t.status = 'called'
+    WHERE t.department_id = ? AND t.status = 'called' AND t.archived = 0
     ORDER BY t.called_at DESC LIMIT 1
   `).get(req.params.dept_id);
   res.json({ ticket: ticket || null });
