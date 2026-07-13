@@ -106,7 +106,12 @@ export default function Settings() {
   return (
     <div className="max-w-3xl">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-navy">System Settings</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-2xl font-bold text-navy">System Settings</h2>
+          <span className="px-2 py-0.5 bg-navy text-teal text-xs font-bold rounded-full tracking-wide">
+            v{typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '—'}
+          </span>
+        </div>
         <div className="flex gap-2">
           <button onClick={handleExportSettings} className="px-4 py-2 border border-navy text-navy rounded-lg hover:bg-navy hover:text-white text-sm font-semibold transition-colors">
             Export Settings

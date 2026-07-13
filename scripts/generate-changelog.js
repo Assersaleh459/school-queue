@@ -255,7 +255,7 @@ const metaRows = [
   ['Product',      'SchoolQ — Queue Management System'],
   ['Client',       'Al-Noor International School'],
   ['Generated',    new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })],
-  ['Versions',     'v1.2.0 → v1.5.18  (13 releases)'],
+  ['Versions',     'v1.2.0 → v1.5.36  (26 releases)'],
 ];
 metaRows.forEach(([k, v], i) => {
   doc.fontSize(8.5).fillColor(C.teal).font('Helvetica-Bold').text(k, 74, 295 + i * 13, { lineBreak: false, width: 90 });
@@ -276,6 +276,18 @@ const idx = [
   { v:'1.5.16', date:'20 May 2026', label:'Force Logout & Socket Security',       type:'security' },
   { v:'1.5.17', date:'20 May 2026', label:'Input Validation & Security Phases 1–4', type:'security' },
   { v:'1.5.18', date:'20 May 2026', label:'UX, Migration Runner & Test Suite',   type:'ux'       },
+  { v:'1.5.25', date:'02 Jun 2026', label:'Cancel Action, Permissions & Ticket Log', type:'minor'  },
+  { v:'1.5.26', date:'03 Jun 2026', label:'Reset Ticket Data',                   type:'ux'       },
+  { v:'1.5.27', date:'03 Jun 2026', label:'Self-Service Kiosk for Parents',      type:'minor'    },
+  { v:'1.5.28', date:'03 Jun 2026', label:'Graceful Port Conflict Handling',     type:'fix'      },
+  { v:'1.5.29', date:'03 Jun 2026', label:'TDZ Crash Fix',                       type:'fix'      },
+  { v:'1.5.30', date:'03 Jun 2026', label:'Kiosk Auto-Print & Permission',       type:'ux'       },
+  { v:'1.5.31', date:'03 Jun 2026', label:'Export/Import Users & Settings',      type:'minor'    },
+  { v:'1.5.32', date:'03 Jun 2026', label:'Datatype Mismatch Fix',               type:'fix'      },
+  { v:'1.5.33', date:'03 Jun 2026', label:'Migrations Table Schema Fix',         type:'fix'      },
+  { v:'1.5.34', date:'03 Jun 2026', label:'Dynamic Port in Server Setup',        type:'fix'      },
+  { v:'1.5.35', date:'03 Jun 2026', label:'Music Pause During Announcements',    type:'ux'       },
+  { v:'1.5.36', date:'03 Jun 2026', label:'Version Display in Admin Settings',   type:'ux'       },
 ];
 const typeBadgeColors = {
   initial:'#3B82F6', patch:'#16A34A', security:'#DC2626',
@@ -960,6 +972,328 @@ bullet('All 16 tests pass in ~2.7 seconds');
 bullet('Test run command: npm test (runs npx jest)');
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  v1.5.25 — CANCEL ACTION, GRANULAR PERMISSIONS, TICKET LOG
+// ─────────────────────────────────────────────────────────────────────────────
+newPage();
+versionHeader({
+  version: '1.5.25', date: '02 Jun 2026', type: 'minor',
+  commit: 'dd236e0',
+  summary: 'Cancel / Left Action, No-Show Reason, Granular Report Permissions & Ticket Log Wait Time Fix',
+  stats: { files: 13, added: 420, removed: 55 },
+});
+commitBlock(`v1.5.25 — cancel action, no-show reason, granular report permissions, ticket log wait time fix
+
+- Cancel/Left action: customer-left-voluntarily status with required reason
+- No-Show now accepts optional reason stored in ticket notes
+- Granular report tab permissions: restrict individual report tabs per user
+- Ticket log wait_minutes shows elapsed time for currently-waiting tickets`);
+
+sectionTitle('Cancel / Left Action');
+bullet('New ticket status: cancelled — distinct from skip (back of queue) and no_show (did not answer calls)');
+bullet('Staff clicks "CANCEL / LEFT" on serving panel or waiting row — required reason field shown');
+bullet('Backend: PUT /queue/tickets/:id/cancel validates reason is not empty (422 if blank)');
+bullet('Ticket updated: status = cancelled, completed_at = now(), notes = "Cancelled: <reason>"');
+bullet('Available on both Queue Dashboard and All Queues screen');
+bullet('Logged to audit log as TICKET_CANCELLED with reason included');
+
+sectionTitle('No-Show Optional Reason');
+bullet('No-Show modal now includes an optional text field for reason');
+bullet('When provided, stored in ticket notes as "No-Show: <reason>"');
+bullet('Helps track patterns (e.g. parent left, wrong department, etc.)');
+
+sectionTitle('Granular Report Tab Permissions');
+bullet('ALL_PAGES in Users.jsx expanded with 5 report sub-keys:');
+sub('reports_daily, reports_service_types, reports_transfers, reports_purposes, reports_ticket_log');
+bullet('Sub-items visually indented (ml-6) under the Reports parent in the Screen Access list');
+bullet('togglePage auto-manages parent: checking any sub-key adds "reports"; removing last sub-key removes "reports"');
+bullet('Reports.jsx filters visible tabs at runtime based on user.allowed_pages:');
+sub('null → all tabs (role defaults)');
+sub('Has reports_* sub-keys → only those tabs shown');
+sub('Only "reports" parent key → all tabs shown');
+bullet('Active tab auto-corrects to first visible tab on mount if current tab is hidden');
+bullet('"cancelled" status added to STATUS_STYLE (gray) and ticket log status filter dropdown');
+
+sectionTitle('Ticket Log Wait Time Fix');
+bullet('Previously: wait_minutes only calculated after ticket was called (NULL for still-waiting tickets)');
+bullet('Fix: SQL CASE expression — waiting tickets use julianday("now") - julianday(created_at) × 1440');
+bullet('Live elapsed wait time now shown for currently waiting tickets in the Ticket Log report');
+
+fileTable([
+  { path: 'src/backend/controllers/queueController.js', added: 25, removed: 3,  note: 'cancel action, noShow with reason' },
+  { path: 'src/backend/routes/queue.js',                added: 2,  removed: 0,  note: 'PUT /tickets/:id/cancel route' },
+  { path: 'src/backend/routes/reports.js',              added: 12, removed: 6,  note: 'wait_minutes fix for waiting tickets' },
+  { path: 'src/frontend/src/lib/api.js',                added: 3,  removed: 1,  note: 'cancel(), noShow with reason param' },
+  { path: 'src/frontend/src/pages/QueueDashboard.jsx',  added: 68, removed: 18, note: 'cancel modal, no-show reason modal' },
+  { path: 'src/frontend/src/pages/AllQueues.jsx',       added: 40, removed: 12, note: 'cancel button + modal' },
+  { path: 'src/frontend/src/pages/admin/Users.jsx',     added: 18, removed: 4,  note: 'report sub-permissions, indentation' },
+  { path: 'src/frontend/src/pages/Reports.jsx',         added: 22, removed: 8,  note: 'tab filter, cancelled status' },
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  v1.5.26 — RESET TICKET DATA
+// ─────────────────────────────────────────────────────────────────────────────
+versionHeader({
+  version: '1.5.26', date: '03 Jun 2026', type: 'ux',
+  commit: '33bc461',
+  summary: 'Danger Zone — Reset All Ticket Data Feature in Admin Settings',
+  stats: { files: 6, added: 50, removed: 5 },
+});
+bullet('"Danger Zone" section added to Admin Settings (visible to super_admin only)');
+bullet('"Reset All Ticket Data" button with two-step confirmation: click → "Are you sure?" → "Yes, Delete All"');
+bullet('Deletes all rows from tickets and transfers tables (users, departments, settings unaffected)');
+bullet('Broadcasts queue_updated to all department Socket.io rooms immediately after reset');
+bullet('Action logged in audit log as TICKETS_RESET');
+bullet('Backend: POST /admin/reset-tickets — requireRole super_admin');
+bullet('Frontend: Settings.jsx uses user.role check to gate Danger Zone section visibility');
+fileTable([
+  { path: 'src/backend/routes/admin.js',                added: 16, removed: 0,  note: 'POST /reset-tickets route' },
+  { path: 'src/frontend/src/lib/api.js',                added: 1,  removed: 0,  note: 'resetTickets() call' },
+  { path: 'src/frontend/src/pages/admin/Settings.jsx',  added: 43, removed: 1,  note: 'Danger Zone UI, useAuthStore import' },
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  v1.5.27 — SELF-SERVICE KIOSK
+// ─────────────────────────────────────────────────────────────────────────────
+newPage();
+versionHeader({
+  version: '1.5.27', date: '03 Jun 2026', type: 'minor',
+  commit: 'fc14665',
+  summary: 'Self-Service Kiosk Screen — Parents Get Tickets Without Reception Staff',
+  stats: { files: 10, added: 310, removed: 3 },
+});
+commitBlock(`v1.5.27 — self-service kiosk screen for parents
+
+New /kiosk page: touch-optimized multi-step flow for parents to
+get queue tickets without needing a reception staff member.
+No login required — publicly accessible like the display screen.`);
+
+sectionTitle('Kiosk Flow (4 steps)');
+bullet('Welcome — "مرحباً · Welcome" full screen with large "Get a Ticket" button');
+bullet('Info — Parent name (required) + student name (optional) — large touch-friendly inputs');
+bullet('Department — Grid of large tappable department buttons');
+bullet('Service Type — Grid of category buttons (only shown if dept has categories); "Other / Not sure" skip option');
+bullet('Done — Ticket number displayed large, estimated wait shown, auto-resets after 30 seconds');
+
+sectionTitle('Technical Details');
+bullet('/kiosk route added to App.jsx without ProtectedRoute (public, like /display)');
+bullet('New backend route: POST /api/kiosk/ticket — no authentication required');
+sub('Validates parent_name and department_id, always creates with priority = regular');
+sub('Emits queue_updated to dept socket room — staff queues update instantly');
+sub('Logs KIOSK_TICKET_CREATED to audit log with null user_id');
+bullet('ticketController.js: exported createTicketTx and calculateWaitTime for reuse by kiosk route');
+bullet('kioskAPI.createTicket() added to api.js frontend API layer');
+bullet('Uses existing departmentAPI.getAll() and departmentAPI.getCategories() (already public endpoints)');
+bullet('Settings (school name, logo) loaded from /api/settings/public on mount');
+bullet('"Self-Service Kiosk" tile added to Home page for admin navigation (orange color)');
+
+fileTable([
+  { path: 'src/backend/routes/kiosk.js',                 added: 35, removed: 0,  note: 'New public ticket creation endpoint', isNew: true },
+  { path: 'src/backend/server.js',                        added: 2,  removed: 0,  note: 'Register /api/kiosk route' },
+  { path: 'src/backend/controllers/ticketController.js',  added: 3,  removed: 0,  note: 'Export createTicketTx, calculateWaitTime' },
+  { path: 'src/frontend/src/pages/Kiosk.jsx',            added: 220, removed: 0, note: 'New touch-optimized kiosk page', isNew: true },
+  { path: 'src/frontend/src/lib/api.js',                  added: 3,  removed: 0,  note: 'kioskAPI.createTicket()' },
+  { path: 'src/frontend/src/App.jsx',                     added: 2,  removed: 0,  note: '/kiosk route (public)' },
+  { path: 'src/frontend/src/pages/Home.jsx',              added: 7,  removed: 0,  note: 'Self-Service Kiosk tile' },
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  v1.5.28 — GRACEFUL PORT CONFLICT HANDLING
+// ─────────────────────────────────────────────────────────────────────────────
+versionHeader({
+  version: '1.5.28', date: '03 Jun 2026', type: 'fix',
+  commit: '983a165',
+  summary: 'Auto Port Scan on Conflict — No Longer Kills Foreign Processes on Port 3000',
+  stats: { files: 6, added: 54, removed: 37 },
+});
+bullet('Old behavior: if port 3000 was busy, Electron forcibly killed the process holding it via PowerShell Stop-Process');
+bullet('New behavior: server auto-scans ports 3000–3010, binds to first available, sets process.env.ACTUAL_PORT');
+bullet('Electron main.js polls ACTUAL_PORT every 200ms until set, then opens window on that port');
+bullet('Removed: isSchoolQOnPort3000(), killPort3000(), exec import from main.js');
+bullet('server.js: server.on("error") catches EADDRINUSE — increments port and retries');
+bullet('If all 10 ports busy: logs clear error and calls process.exit(1)');
+bullet('Staff client URL config (http://server:3000) still works — staff always explicitly configure the port');
+fileTable([
+  { path: 'src/backend/server.js',  added: 20, removed: 5,  note: 'tryListen(), auto port scan, ACTUAL_PORT' },
+  { path: 'electron/main.js',       added: 18, removed: 32, note: 'waitForActualServer(), removed kill logic' },
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  v1.5.29 — TDZ CRASH FIX
+// ─────────────────────────────────────────────────────────────────────────────
+versionHeader({
+  version: '1.5.29', date: '03 Jun 2026', type: 'fix',
+  commit: '7d746f6',
+  summary: 'Fix Temporal Dead Zone Crash — Cannot access createTicketTx before initialization',
+  stats: { files: 5, added: 6, removed: 5 },
+});
+bullet('Error: "Cannot access createTicketTx before initialization" on every startup');
+bullet('Root cause: exports.createTicketTx = createTicketTx placed BEFORE the const createTicketTx = db.transaction(...) declaration');
+bullet('JavaScript const is not hoisted — accessing it before declaration throws ReferenceError (TDZ)');
+bullet('Fix: moved exports.createTicketTx = createTicketTx to AFTER the db.transaction() assignment');
+bullet('One-line fix in ticketController.js — no functional change, just export order correction');
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  v1.5.30 — KIOSK AUTO-PRINT & PERMISSION
+// ─────────────────────────────────────────────────────────────────────────────
+newPage();
+versionHeader({
+  version: '1.5.30', date: '03 Jun 2026', type: 'ux',
+  commit: '7b82dc4',
+  summary: 'Kiosk Auto-Print Ticket + Kiosk Permission in Screen Access',
+  stats: { files: 7, added: 186, removed: 208 },
+});
+bullet('Kiosk now auto-prints ticket immediately after parent selects service or department');
+bullet('No manual "Print" button needed — print dialog opens automatically 600ms after ticket creation');
+bullet('@media print CSS: kiosk screen hidden, TicketReceipt shown for printing');
+bullet('@media screen: receipt div hidden on screen, only shown when printing');
+bullet('afterprint event listener resets kiosk to Welcome screen (1.5s grace period)');
+bullet('45-second fallback timeout resets screen if printer is offline and afterprint never fires');
+bullet('"kiosk" permission key added to ALL_PAGES in Users.jsx Screen Access section');
+bullet('Home page kiosk tile uses page: "kiosk" — tile hidden when user has restricted access and kiosk not granted');
+fileTable([
+  { path: 'src/frontend/src/pages/Kiosk.jsx',      added: 186, removed: 208, note: 'Auto-print, @media CSS, afterprint reset' },
+  { path: 'src/frontend/src/pages/admin/Users.jsx', added: 1,   removed: 0,   note: 'kiosk key in ALL_PAGES' },
+  { path: 'src/frontend/src/pages/Home.jsx',        added: 1,   removed: 1,   note: 'page: null → page: "kiosk"' },
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  v1.5.31 — EXPORT/IMPORT USERS & SETTINGS + SCROLLBAR FIX
+// ─────────────────────────────────────────────────────────────────────────────
+versionHeader({
+  version: '1.5.31', date: '03 Jun 2026', type: 'minor',
+  commit: 'bd09e57',
+  summary: 'Export/Import Users & Settings, Migrations Runner Restore, Scrollbar Fix',
+  stats: { files: 12, added: 180, removed: 21 },
+});
+sectionTitle('Export/Import Users');
+bullet('Admin Users page: "Export" button downloads JSON file of all users (with password_hash for migration)');
+bullet('Admin Users page: "Import" button accepts JSON file — creates users that don\'t exist, skips existing usernames');
+bullet('Import supports both password_hash (direct) and password (plain — auto-hashed via bcrypt)');
+bullet('Results shown: "Imported X users, skipped Y"');
+bullet('Endpoints: GET /admin/export/users, POST /admin/import/users — both require super_admin');
+
+sectionTitle('Export/Import Settings');
+bullet('Admin Settings page: "Export Settings" downloads current settings as JSON');
+bullet('"Import Settings" accepts a JSON file and applies all key-value pairs via existing saveSettings logic');
+bullet('After import, local state updates to reflect new values without page reload');
+
+sectionTitle('Other Fixes');
+bullet('User form modal: added p-4 padding, max-h-[90vh], overflow-y-auto — form scrolls instead of getting cut off on small screens');
+bullet('migrations/runner.js properly restored to source control (was gitignored by incorrect database/ pattern)');
+bullet('.gitignore: database/ → /database/ (only ignore root-level database/ folder, not src/backend/database/)');
+
+fileTable([
+  { path: 'src/backend/routes/admin.js',                added: 36, removed: 0,  note: 'Export/import users routes' },
+  { path: 'src/frontend/src/lib/api.js',                added: 2,  removed: 0,  note: 'exportUsers(), importUsers()' },
+  { path: 'src/frontend/src/pages/admin/Users.jsx',     added: 42, removed: 6,  note: 'Export/Import UI buttons + handlers' },
+  { path: 'src/frontend/src/pages/admin/Settings.jsx',  added: 42, removed: 1,  note: 'Export/Import settings UI + handlers' },
+  { path: '.gitignore',                                  added: 1,  removed: 1,  note: '/database/ fix' },
+  { path: 'src/backend/database/migrations/runner.js',  added: 44, removed: 0,  note: 'Restored to source control', isNew: true },
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  v1.5.32 — DATATYPE MISMATCH FIX + ERROR DIAGNOSTICS
+// ─────────────────────────────────────────────────────────────────────────────
+newPage();
+versionHeader({
+  version: '1.5.32', date: '03 Jun 2026', type: 'fix',
+  commit: 'f168c7f',
+  summary: 'Fix Datatype Mismatch on Startup + Improved Error Dialog with Stack Trace',
+  stats: { files: 5, added: 6, removed: 6 },
+});
+bullet('Migration runner was using db.prepare(sql).run() for ALTER TABLE statements');
+bullet('Correct API for DDL statements in better-sqlite3 is db.exec() — prepare().run() is for DML only');
+bullet('Fix: changed to db.exec(migration.sql) in the for loop');
+bullet('Error dialog in Electron now shows full stack trace (err.stack) instead of just err.message');
+bullet('Stack trace appears in the "Failed to Start" dialog body — helps diagnose startup failures');
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  v1.5.33 — MIGRATIONS TABLE SCHEMA FIX
+// ─────────────────────────────────────────────────────────────────────────────
+versionHeader({
+  version: '1.5.33', date: '03 Jun 2026', type: 'fix',
+  commit: '404e94e',
+  summary: 'Fix Migrations Table INTEGER vs TEXT Schema Mismatch — Datatype Mismatch on Existing Databases',
+  stats: { files: 5, added: 18, removed: 4 },
+});
+bullet('Root cause: old database had migrations table created with id INTEGER PRIMARY KEY by an earlier version');
+bullet('CREATE TABLE IF NOT EXISTS preserves the wrong schema — no error, table unchanged');
+bullet('Then: INSERT INTO migrations (id) VALUES ("001_add_speak_language") fails — cannot insert TEXT into INTEGER PRIMARY KEY');
+bullet('SQLite error: "datatype mismatch" — caught by Electron uncaughtException handler → startup fails');
+bullet('Fix: use PRAGMA table_info(migrations) to read the actual column type of "id"');
+bullet('If type is not TEXT: DROP TABLE IF EXISTS migrations → CREATE TABLE with correct TEXT PRIMARY KEY');
+bullet('All migrations re-run (catching "duplicate column name" for already-applied ones) → records inserted into new table');
+bullet('Safe for both fresh installs and upgrades — no data loss (migrations table only tracks schema history)');
+fileTable([
+  { path: 'src/backend/database/migrations/runner.js', added: 14, removed: 0, note: 'PRAGMA type check, drop/recreate if wrong schema' },
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  v1.5.34 — DYNAMIC PORT IN SERVER SETUP
+// ─────────────────────────────────────────────────────────────────────────────
+versionHeader({
+  version: '1.5.34', date: '03 Jun 2026', type: 'fix',
+  commit: '5702888',
+  summary: 'Remove Hardcoded Port 3000 from Server Setup — Test Uses Real IP:Port',
+  stats: { files: 7, added: 52, removed: 27 },
+});
+bullet('ServerSetup.jsx: added Port input field (default 3000) alongside the server IP field');
+bullet('"Test Connection" now hits ip:port, shows the exact address tested in the result message');
+bullet('Save & Relaunch: server mode saves http://localhost:<window.location.port> (picks up auto-shifted port)');
+bullet('Save & Relaunch: client mode saves http://<ip>:<entered-port>');
+bullet('preload.js: testServer(ip, port) passes port through IPC channel');
+bullet('main.js test-server handler: accepts port parameter, uses parseInt(port) || 3000');
+bullet('On existing config load: correctly parses port from saved URL via new URL(cfg.serverUrl).port');
+fileTable([
+  { path: 'src/frontend/src/pages/ServerSetup.jsx', added: 25, removed: 18, note: 'Port field, dynamic URL building' },
+  { path: 'electron/preload.js',                     added: 1,  removed: 1,  note: 'testServer(ip, port)' },
+  { path: 'electron/main.js',                        added: 1,  removed: 1,  note: 'Port parameter in HTTP request' },
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  v1.5.35 — MUSIC PAUSE DURING ANNOUNCEMENTS
+// ─────────────────────────────────────────────────────────────────────────────
+versionHeader({
+  version: '1.5.35', date: '03 Jun 2026', type: 'ux',
+  commit: 'cffe6b0',
+  summary: 'Auto-Pause Background Music During Ticket Announcements via Media Key',
+  stats: { files: 7, added: 49, removed: 8 },
+});
+bullet('Problem: display PC plays background music in reception — TTS announcements mix with music');
+bullet('Solution: send system-wide Media Play/Pause key before TTS, resume after');
+bullet('Works with Spotify, YouTube, VLC, Windows Media Player — any player that responds to media keys');
+bullet('On ticket call: music pauses → TTS announcement plays → music resumes automatically');
+bullet('Rapid consecutive tickets handled correctly: musicPaused ref prevents double-pause');
+sub('First ticket: pause music, play TTS, resume');
+sub('Second ticket before first finishes: skip re-pause (already paused), play TTS, resume after last one');
+bullet('media-key.ps1 written to userData on app startup — uses keybd_event(VK_MEDIA_PLAY_PAUSE = 0xB3)');
+bullet('IPC: preload exposes mediaPlayPause(), main.js handles via execFile powershell');
+bullet('No-op when display opened in a regular browser (window.electronAPI not available)');
+fileTable([
+  { path: 'electron/main.js',                              added: 18, removed: 1,  note: 'media-key.ps1 write on ready, IPC handler' },
+  { path: 'electron/preload.js',                           added: 1,  removed: 1,  note: 'mediaPlayPause() exposed' },
+  { path: 'src/frontend/src/pages/PublicDisplay.jsx',      added: 18, removed: 6,  note: 'musicPaused ref, pre/post announce IPC call' },
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  v1.5.36 — VERSION NUMBER IN ADMIN SETTINGS
+// ─────────────────────────────────────────────────────────────────────────────
+versionHeader({
+  version: '1.5.36', date: '03 Jun 2026', type: 'ux',
+  commit: 'pending',
+  summary: 'Version Number Displayed in Admin Settings Header',
+  stats: { files: 2, added: 8, removed: 1 },
+});
+bullet('vite.config.js: reads version from package.json at build time, injects as __APP_VERSION__ global constant');
+bullet('Admin Settings page header now shows the running version as a navy/teal pill badge (e.g. "v1.5.36")');
+bullet('Badge appears next to "System Settings" heading — always visible to super_admin');
+bullet('No runtime API call needed — version is baked into the bundle at build time');
+fileTable([
+  { path: 'src/frontend/vite.config.js',                  added: 4,  removed: 0,  note: '__APP_VERSION__ define' },
+  { path: 'src/frontend/src/pages/admin/Settings.jsx',    added: 6,  removed: 1,  note: 'Version badge in header' },
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  SUMMARY PAGE
 // ─────────────────────────────────────────────────────────────────────────────
 newPage();
@@ -984,6 +1318,18 @@ const timeline = [
   { v:'v1.5.16', date:'20 May 2026', type:'security', desc:'Force logout, socket JWT auth, is_active check, JWT→8h' },
   { v:'v1.5.17', date:'20 May 2026', type:'security', desc:'Input validation, per-install secret, rate limit, error handler, indexes' },
   { v:'v1.5.18', date:'20 May 2026', type:'ux',       desc:'Toast notifications, skeleton loader, migration runner, 16 tests' },
+  { v:'v1.5.25', date:'02 Jun 2026', type:'minor',    desc:'Cancel/Left action, no-show reason, granular report permissions, ticket log wait fix' },
+  { v:'v1.5.26', date:'03 Jun 2026', type:'ux',       desc:'Reset All Ticket Data — Danger Zone in admin settings' },
+  { v:'v1.5.27', date:'03 Jun 2026', type:'minor',    desc:'Self-service kiosk — touch panel for parents to get tickets without staff' },
+  { v:'v1.5.28', date:'03 Jun 2026', type:'fix',      desc:'Auto port scan 3000–3010, no longer kills foreign processes' },
+  { v:'v1.5.29', date:'03 Jun 2026', type:'fix',      desc:'Temporal dead zone crash fix in ticketController exports' },
+  { v:'v1.5.30', date:'03 Jun 2026', type:'ux',       desc:'Kiosk auto-prints ticket + kiosk permission in screen access' },
+  { v:'v1.5.31', date:'03 Jun 2026', type:'minor',    desc:'Export/import users & settings, scrollbar fix, migrations restored' },
+  { v:'v1.5.32', date:'03 Jun 2026', type:'fix',      desc:'db.exec() for DDL in migration runner, stack trace in error dialog' },
+  { v:'v1.5.33', date:'03 Jun 2026', type:'fix',      desc:'Migrations table schema mismatch — PRAGMA detect and recreate' },
+  { v:'v1.5.34', date:'03 Jun 2026', type:'fix',      desc:'Dynamic port in ServerSetup — test uses real IP:port, not hardcoded 3000' },
+  { v:'v1.5.35', date:'03 Jun 2026', type:'ux',       desc:'Media key pause/resume — music stops during TTS announcements' },
+  { v:'v1.5.36', date:'03 Jun 2026', type:'ux',       desc:'Version badge in admin settings header, Vite __APP_VERSION__ injection' },
 ];
 const tc = { initial:C.navy, patch:C.green, security:C.red, fix:C.amber, minor:C.blue, ux:C.purple };
 timeline.forEach((r, i) => {
@@ -1000,11 +1346,11 @@ timeline.forEach((r, i) => {
 
 sectionTitle('Cumulative Change Statistics');
 const stats = [
-  ['Total versions released',      '13 (v1.2.0 → v1.5.18)'],
-  ['Total git commits',            '13 commits on main branch'],
-  ['Total files ever modified',    '~65 unique files touched'],
-  ['Lines added across all commits','~18,900+'],
-  ['Lines removed across all commits','~1,100+'],
+  ['Total versions released',      '26 (v1.2.0 → v1.5.36)'],
+  ['Total git commits',            '25+ commits on main branch'],
+  ['Total files ever modified',    '~80 unique files touched'],
+  ['Lines added across all commits','~22,000+'],
+  ['Lines removed across all commits','~2,200+'],
   ['Backend files modified',       '~20 (routes, controllers, middleware, DB)'],
   ['Frontend files modified',      '~30 (pages, components, stores, hooks)'],
   ['New files created',            '13 (audit.js, settingsCache.js, validate.js, errorHandler.js,\n                         runner.js, Toast.jsx, useToastStore.js, 2 new pages, 3 test files, scripts/)'],
