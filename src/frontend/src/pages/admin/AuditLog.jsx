@@ -95,7 +95,7 @@ export default function AuditLog() {
             ) : logs.map(l => (
               <tr key={l.log_id} className="border-b hover:bg-gray-50">
                 <td className="px-4 py-2 text-gray-500 whitespace-nowrap font-mono text-xs">
-                  {new Date(l.logged_at).toLocaleString()}
+                  {new Date(l.logged_at + 'Z').toLocaleString()}
                 </td>
                 <td className="px-4 py-2 font-medium">
                   {l.full_name || l.username || <span className="text-gray-400">System</span>}

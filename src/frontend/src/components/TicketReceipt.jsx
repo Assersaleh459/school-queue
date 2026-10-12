@@ -35,7 +35,7 @@ export default function TicketReceipt({ ticket, schoolName = 'Al-Noor School', t
               <p className="text-lg"><span className="font-semibold">Student:</span> {ticket.student_name}</p>
             )}
             {show('ticket_show_time') && (
-              <p className="text-lg"><span className="font-semibold">Time:</span> {new Date(ticket.created_at).toLocaleTimeString()}</p>
+              <p className="text-lg"><span className="font-semibold">Time:</span> {new Date(ticket.created_at + 'Z').toLocaleTimeString()}</p>
             )}
             {show('ticket_show_wait') && ticket.estimated_wait && (
               <p className="text-lg"><span className="font-semibold">Est. Wait:</span> {ticket.estimated_wait} minutes</p>

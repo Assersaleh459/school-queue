@@ -21,6 +21,15 @@ const MIGRATIONS = [
     id: '005_add_ticket_archived',
     sql: 'ALTER TABLE tickets ADD COLUMN archived INTEGER DEFAULT 0',
   },
+  {
+    // Before v1.5.48, service_duration parsed the UTC called_at as local time,
+    // inflating every value by the server's UTC offset. Recompute from the
+    // stored timestamps, which are both UTC and unaffected.
+    id: '006_fix_service_duration_timezone',
+    sql: `UPDATE tickets
+          SET service_duration = CAST(ROUND((julianday(completed_at) - julianday(called_at)) * 1440) AS INTEGER)
+          WHERE status = 'completed' AND called_at IS NOT NULL AND completed_at IS NOT NULL`,
+  },
 ];
 
 function runMigrations(db) {

@@ -4,17 +4,16 @@ const { log } = require('../audit');
 function generateTicketNumber(dept_code, date, priority) {
   const dateStr = date.toISOString().split('T')[0].replace(/-/g, '');
 
-  const lastTicket = db.prepare(`
-    SELECT ticket_number FROM tickets
-    WHERE ticket_number LIKE ? AND DATE(created_at) = DATE(?)
-    ORDER BY created_at DESC LIMIT 1
-  `).get(`${dept_code}-${dateStr}-%`, date.toISOString().split('T')[0]);
+  // Use the highest sequence issued today, not the newest row: skip rewrites
+  // created_at, so "latest by created_at" can be an older number → duplicate.
+  const todays = db.prepare(
+    'SELECT ticket_number FROM tickets WHERE ticket_number LIKE ?'
+  ).all(`${dept_code}-${dateStr}-%`);
 
-  let sequence = 1;
-  if (lastTicket) {
-    const match = lastTicket.ticket_number.match(/-(\d+)[A-Z]?$/);
-    if (match) sequence = parseInt(match[1]) + 1;
-  }
+  const sequence = todays.reduce((max, t) => {
+    const match = t.ticket_number.match(/-(\d+)[A-Z]?$/);
+    return match ? Math.max(max, parseInt(match[1])) : max;
+  }, 0) + 1;
 
   const seqStr = sequence.toString().padStart(3, '0');
   const priorityFlag = priority === 'urgent' ? 'U' : priority === 'elderly' ? 'P' : priority === 'vip' ? 'V' : '';

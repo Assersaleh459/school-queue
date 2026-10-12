@@ -185,7 +185,7 @@ export default function Settings() {
               <p className="text-sm text-gray-600 mt-1">
                 {reprintTicket.parent_name} · {reprintTicket.student_name || '—'}
               </p>
-              <p className="text-xs text-gray-400">{reprintTicket.department_name} · {new Date(reprintTicket.created_at).toLocaleString()}</p>
+              <p className="text-xs text-gray-400">{reprintTicket.department_name} · {new Date(reprintTicket.created_at + 'Z').toLocaleString()}</p>
             </div>
             <button
               onClick={() => setShowReprintReceipt(true)}

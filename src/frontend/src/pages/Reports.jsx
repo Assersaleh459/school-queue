@@ -423,7 +423,7 @@ function TransferReport() {
       startY: 30,
       head: [['Date & Time', 'Ticket #', 'Parent', 'Student', 'From', 'To', 'Reason', 'By']],
       body: data.map(r => [
-        new Date(r.transferred_at).toLocaleString(), r.ticket_number,
+        new Date(r.transferred_at + 'Z').toLocaleString(), r.ticket_number,
         r.parent_name, r.student_name || '—',
         r.from_department, r.to_department, r.reason || '—', r.transferred_by || '—'
       ]),
@@ -435,7 +435,7 @@ function TransferReport() {
 
   const exportToExcel = () => {
     const rows = data.map(r => ({
-      'Date': new Date(r.transferred_at).toLocaleString(),
+      'Date': new Date(r.transferred_at + 'Z').toLocaleString(),
       'Ticket #': r.ticket_number, 'Parent': r.parent_name, 'Student': r.student_name || '',
       'From': r.from_department, 'To': r.to_department,
       'Reason': r.reason || '', 'Transferred By': r.transferred_by || ''
@@ -502,7 +502,7 @@ function TransferReport() {
               <tbody>
                 {data.map(r => (
                   <tr key={r.transfer_id} className="border-b hover:bg-gray-50">
-                    <td className="px-4 py-3 text-gray-500 text-xs">{new Date(r.transferred_at).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-gray-500 text-xs">{new Date(r.transferred_at + 'Z').toLocaleString()}</td>
                     <td className="px-4 py-3 font-mono font-bold">{r.ticket_number}</td>
                     <td className="px-4 py-3">{r.parent_name}</td>
                     <td className="px-4 py-3 text-gray-500">{r.student_name || '—'}</td>
@@ -706,8 +706,8 @@ function TicketLog() {
     finally { setLoading(false); }
   };
 
-  const fmt = (iso) => iso ? new Date(iso).toLocaleString() : '—';
-  const fmtTime = (iso) => iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+  const fmt = (iso) => iso ? new Date(iso + 'Z').toLocaleString() : '—';
+  const fmtTime = (iso) => iso ? new Date(iso + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
 
   const exportToPDF = () => {
     const doc = new jsPDF('l', 'mm', 'a4');

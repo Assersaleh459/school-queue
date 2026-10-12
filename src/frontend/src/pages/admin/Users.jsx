@@ -206,7 +206,7 @@ export default function Users() {
                 </td>
                 <td className="px-5 py-3 text-gray-600">{deptName(u.department_id)}</td>
                 <td className="px-5 py-3 text-sm text-gray-500">
-                  {u.last_login ? new Date(u.last_login).toLocaleString() : 'Never'}
+                  {u.last_login ? new Date(u.last_login + 'Z').toLocaleString() : 'Never'}
                 </td>
                 <td className="px-5 py-3">
                   <button

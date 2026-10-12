@@ -169,7 +169,7 @@ export default function QueueDashboard() {
   };
 
   const calculateWaitTime = (createdAt) => {
-    const minutes = Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000);
+    const minutes = Math.floor((Date.now() - new Date(createdAt + 'Z').getTime()) / 60000);
     return `${minutes} min`;
   };
 

@@ -255,7 +255,7 @@ const metaRows = [
   ['Product',      'SchoolQ — Queue Management System'],
   ['Client',       'Al-Noor International School'],
   ['Generated',    new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })],
-  ['Versions',     'v1.2.0 → v1.5.36  (26 releases)'],
+  ['Versions',     'v1.2.0 → v1.5.48  (30 releases)'],
 ];
 metaRows.forEach(([k, v], i) => {
   doc.fontSize(8.5).fillColor(C.teal).font('Helvetica-Bold').text(k, 74, 295 + i * 13, { lineBreak: false, width: 90 });
@@ -287,16 +287,22 @@ const idx = [
   { v:'1.5.33', date:'03 Jun 2026', label:'Migrations Table Schema Fix',         type:'fix'      },
   { v:'1.5.34', date:'03 Jun 2026', label:'Dynamic Port in Server Setup',        type:'fix'      },
   { v:'1.5.35', date:'03 Jun 2026', label:'Music Pause During Announcements',    type:'ux'       },
-  { v:'1.5.36', date:'03 Jun 2026', label:'Version Display in Admin Settings',   type:'ux'       },
+  { v:'1.5.36', date:'13 Jul 2026', label:'Version Display in Admin Settings',   type:'ux'       },
+  { v:'1.5.45', date:'04 Jul 2026', label:'Audio Fixes & Standalone Screens',    type:'minor'    },
+  { v:'1.5.46', date:'04 Jul 2026', label:'Archival, Backups & Licensing',       type:'minor'    },
+  { v:'1.5.47', date:'12 Oct 2026', label:'Branch Merge (v1.5.36 + v1.5.46)',    type:'patch'    },
+  { v:'1.5.48', date:'12 Oct 2026', label:'Timezone & Ticket Numbering Fixes',   type:'fix'      },
 ];
 const typeBadgeColors = {
   initial:'#3B82F6', patch:'#16A34A', security:'#DC2626',
   fix:'#D97706', minor:'#2563EB', ux:'#7C3AED'
 };
+// Shrink rows as versions accumulate so the index stays above the page number
+const idxRowH = Math.min(20, (doc.page.height - 45 - 422) / idx.length);
 idx.forEach((r, i) => {
-  const y = 422 + i * 20;
+  const y = 422 + i * idxRowH;
   const bc = typeBadgeColors[r.type] || C.navy;
-  doc.rect(62, y, 36, 13).fill(bc);
+  doc.rect(62, y, 36, Math.min(13, idxRowH - 1)).fill(bc);
   doc.fontSize(7.5).fillColor(C.white).font('Helvetica-Bold')
      .text(`v${r.v}`, 64, y + 3, { lineBreak: false, width: 34 });
   doc.fillColor('rgba(255,255,255,0.8)').font('Helvetica')
@@ -1279,8 +1285,8 @@ fileTable([
 //  v1.5.36 — VERSION NUMBER IN ADMIN SETTINGS
 // ─────────────────────────────────────────────────────────────────────────────
 versionHeader({
-  version: '1.5.36', date: '03 Jun 2026', type: 'ux',
-  commit: 'pending',
+  version: '1.5.36', date: '13 Jul 2026', type: 'ux',
+  commit: '0a9d170',
   summary: 'Version Number Displayed in Admin Settings Header',
   stats: { files: 2, added: 8, removed: 1 },
 });
@@ -1291,6 +1297,91 @@ bullet('No runtime API call needed — version is baked into the bundle at build
 fileTable([
   { path: 'src/frontend/vite.config.js',                  added: 4,  removed: 0,  note: '__APP_VERSION__ define' },
   { path: 'src/frontend/src/pages/admin/Settings.jsx',    added: 6,  removed: 1,  note: 'Version badge in header' },
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  v1.5.45 — AUDIO FIXES, SINGLE INSTANCE, STANDALONE SCREENS
+// ─────────────────────────────────────────────────────────────────────────────
+versionHeader({
+  version: '1.5.45', date: '04 Jul 2026', type: 'minor',
+  commit: 'cccfe15',
+  summary: 'Announcement Audio Fixes, Single-Instance Server, Standalone Access-Controlled Screens',
+  stats: { files: 17, added: 192, removed: 53 },
+});
+bullet('Silent call/recall fixed — root cause: duplicate Server instances (ports 3000 + 3001) sharing one DB with isolated socket rooms');
+sub('Server build now enforces a single instance; Staff/client builds may still open multiple windows');
+bullet('Display plays announcements without a click (Electron autoplayPolicy)');
+bullet('Music pause now works: Chromium hardware media-key capture disabled so Play/Pause reaches the external player');
+bullet('On-screen audio/socket diagnostics removed from the public display');
+bullet('Queue Control (/queue-control) and Announcements (/announcements) available outside the Admin panel');
+sub('Shared ScreenShell layout, Home tiles, and entries in Users → Screen Access');
+sub('New requirePageAccess middleware lets granted non-admins use the announcements API');
+bullet('Settings language selector no longer jumps the page scroll');
+fileTable([
+  { path: 'electron/main.js',                              added: 42, removed: 3,  note: 'Single-instance lock, autoplay, media-key capture off' },
+  { path: 'src/backend/middleware/auth.js',                added: 16, removed: 1,  note: 'requirePageAccess()' },
+  { path: 'src/backend/routes/announcements.js',           added: 36, removed: 0,  note: 'Page-access gated management routes' },
+  { path: 'src/frontend/src/pages/ScreenShell.jsx',        added: 37, removed: 0,  note: 'NEW — standalone screen wrapper' },
+  { path: 'src/frontend/src/App.jsx',                      added: 13, removed: 0,  note: 'Standalone routes' },
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  v1.5.46 — DATA ARCHIVAL, BACKUPS, OFFLINE LICENSING
+// ─────────────────────────────────────────────────────────────────────────────
+versionHeader({
+  version: '1.5.46', date: '04 Jul 2026', type: 'minor',
+  commit: '311fcb2',
+  summary: 'Start-a-New-Day Archival, Automatic Backups, Offline License Activation',
+  stats: { files: 23, added: 634, removed: 20 },
+});
+bullet('tickets.archived column (migration 005) — live queues and display hide archived rows, reports still read everything');
+bullet('Settings → "Start a New Day" archives current tickets instead of deleting them');
+bullet('Automatic daily online DB backup, last 14 kept (database/backup.js)');
+sub('Settings → Backups: Backup Now, list, Open Folder, Restore (staged file swapped in on next start)');
+bullet('Offline Ed25519 license verification — Server build shows an activation screen, key bound to machine id');
+sub('tools/generate-license.js mints per-school keys; private key kept in .keys/ (gitignored, never shipped)');
+fileTable([
+  { path: 'src/backend/database/backup.js',                added: 54, removed: 0,  note: 'NEW — online backup + prune' },
+  { path: 'electron/license.js',                           added: 87, removed: 0,  note: 'NEW — Ed25519 verification' },
+  { path: 'electron/activation.html',                      added: 84, removed: 0,  note: 'NEW — activation screen' },
+  { path: 'src/backend/routes/admin.js',                   added: 39, removed: 0,  note: 'archive-tickets, backup endpoints' },
+  { path: 'src/frontend/src/pages/admin/Settings.jsx',     added: 128, removed: 0, note: 'New Day + Backups sections' },
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  v1.5.47 — BRANCH MERGE
+// ─────────────────────────────────────────────────────────────────────────────
+versionHeader({
+  version: '1.5.47', date: '12 Oct 2026', type: 'patch',
+  commit: 'fcb4798',
+  summary: 'Merged the Unpushed v1.5.36 Work into the v1.5.46 Line',
+  stats: { files: 8, added: 367, removed: 11 },
+});
+bullet('v1.5.36 (version badge + changelog) was committed locally after GitHub had moved to v1.5.46');
+bullet('Merge commit joins both histories — nothing from either side was lost; fast-forward push, no force push');
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  v1.5.48 — TIMEZONE & TICKET NUMBERING FIXES
+// ─────────────────────────────────────────────────────────────────────────────
+versionHeader({
+  version: '1.5.48', date: '12 Oct 2026', type: 'fix',
+  commit: 'this release',
+  summary: 'Correct Service Times & Clock Display, No Duplicate Ticket Numbers After Skip',
+  stats: { files: 14, added: 161, removed: 28 },
+});
+bullet('Service time was inflated by the server\'s UTC offset (+180 min in Jordan) — SQLite UTC timestamps were parsed as local time');
+sub('Migration 006 recomputes existing service_duration values from called_at / completed_at');
+bullet('Reception error "UNIQUE constraint failed" after a skip — numbering now continues from the highest sequence issued today');
+bullet('Printed ticket, staff dashboard wait time, reports, audit log, users list showed times 3 hours early — fixed');
+bullet('Complete is refused unless the ticket is currently being served (no completing waiting or finished tickets)');
+bullet('Call-next and transfer record the logged-in user, not a staff_id sent by the browser');
+bullet('10 new unit tests (queue.test.js); verified with a full API/socket and browser end-to-end run');
+fileTable([
+  { path: 'src/backend/controllers/queueController.js',    added: 6,  removed: 3,  note: 'UTC parse, status guard, req.user' },
+  { path: 'src/backend/controllers/ticketController.js',   added: 10, removed: 11, note: 'Max-sequence numbering' },
+  { path: 'src/backend/database/migrations/runner.js',     added: 9,  removed: 0,  note: 'Migration 006' },
+  { path: 'src/backend/tests/queue.test.js',               added: 122, removed: 0, note: 'NEW — 10 tests' },
+  { path: 'src/frontend/src/ (6 files)',                   added: 10, removed: 10, note: 'UTC-correct time display' },
 ]);
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1329,7 +1420,11 @@ const timeline = [
   { v:'v1.5.33', date:'03 Jun 2026', type:'fix',      desc:'Migrations table schema mismatch — PRAGMA detect and recreate' },
   { v:'v1.5.34', date:'03 Jun 2026', type:'fix',      desc:'Dynamic port in ServerSetup — test uses real IP:port, not hardcoded 3000' },
   { v:'v1.5.35', date:'03 Jun 2026', type:'ux',       desc:'Media key pause/resume — music stops during TTS announcements' },
-  { v:'v1.5.36', date:'03 Jun 2026', type:'ux',       desc:'Version badge in admin settings header, Vite __APP_VERSION__ injection' },
+  { v:'v1.5.36', date:'13 Jul 2026', type:'ux',       desc:'Version badge in admin settings header, Vite __APP_VERSION__ injection' },
+  { v:'v1.5.45', date:'04 Jul 2026', type:'minor',    desc:'Single-instance server, announcement audio fixes, standalone screens' },
+  { v:'v1.5.46', date:'04 Jul 2026', type:'minor',    desc:'New-day archival, automatic backups, offline license activation' },
+  { v:'v1.5.47', date:'12 Oct 2026', type:'patch',    desc:'Merge of unpushed v1.5.36 work into the v1.5.46 line' },
+  { v:'v1.5.48', date:'12 Oct 2026', type:'fix',      desc:'Timezone-correct service times & clocks, no duplicate numbers after skip' },
 ];
 const tc = { initial:C.navy, patch:C.green, security:C.red, fix:C.amber, minor:C.blue, ux:C.purple };
 timeline.forEach((r, i) => {
@@ -1346,7 +1441,7 @@ timeline.forEach((r, i) => {
 
 sectionTitle('Cumulative Change Statistics');
 const stats = [
-  ['Total versions released',      '26 (v1.2.0 → v1.5.36)'],
+  ['Total versions released',      '30 (v1.2.0 → v1.5.48)'],
   ['Total git commits',            '25+ commits on main branch'],
   ['Total files ever modified',    '~80 unique files touched'],
   ['Lines added across all commits','~22,000+'],
@@ -1355,7 +1450,7 @@ const stats = [
   ['Frontend files modified',      '~30 (pages, components, stores, hooks)'],
   ['New files created',            '13 (audit.js, settingsCache.js, validate.js, errorHandler.js,\n                         runner.js, Toast.jsx, useToastStore.js, 2 new pages, 3 test files, scripts/)'],
   ['Files deleted',                '2 (AdminPanel.jsx, DisplayMonitor.jsx — legacy)'],
-  ['Test coverage',                '16 tests — auth validation, ticket validation, middleware rules'],
+  ['Test coverage',                '26 tests — auth, ticket validation, middleware rules, queue logic'],
   ['Supported platforms',          'Windows 10/11 x64 (Electron 41)'],
   ['Node.js runtime (backend)',    'Electron bundled Node (v24-based, ABI 145)'],
 ];
@@ -1371,7 +1466,7 @@ const mat = [
   { area:'Database Design',            grade:'B',  color:C.teal,   note:'WAL, foreign keys, 10 indexes, migration runner, transactions' },
   { area:'Real-time Features',         grade:'A-', color:C.green,  note:'Socket.io with auth, force-logout events, dept rooms, user tracking' },
   { area:'Logging & Audit',            grade:'C+', color:C.amber,  note:'Audit log table + morgan; no structured logging, no rotation' },
-  { area:'Testing',                    grade:'C+', color:C.amber,  note:'16 unit tests; no E2E, no frontend tests, no CI pipeline' },
+  { area:'Testing',                    grade:'C+', color:C.amber,  note:'26 unit tests; E2E run manually, not automated; no CI pipeline' },
   { area:'Code Organization',          grade:'B+', color:C.green,  note:'Clean route/controller split, Zustand, API layer, no fat controllers' },
   { area:'User Experience',            grade:'B',  color:C.teal,   note:'Toast system, skeleton loaders, real-time updates, bilingual voice' },
   { area:'Build & Deployment',         grade:'B-', color:C.amber,  note:'2 installer targets, per-install secret; no auto-update, no code signing' },

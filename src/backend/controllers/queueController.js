@@ -36,7 +36,7 @@ exports.getDisplayData = (req, res) => {
 
 exports.callNext = (req, res) => {
   const { dept_id } = req.params;
-  const { staff_id } = req.body;
+  const staff_id = req.user.user_id;
 
   try {
     const ticket = db.prepare(`
@@ -94,8 +94,10 @@ exports.complete = (req, res) => {
   try {
     const ticket = db.prepare('SELECT * FROM tickets WHERE ticket_id = ?').get(ticket_id);
     if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+    if (ticket.status !== 'called') return res.status(409).json({ error: 'Ticket is not currently being served' });
 
-    const duration = Math.round((Date.now() - new Date(ticket.called_at).getTime()) / 60000);
+    // called_at is SQLite UTC without a zone marker — append 'Z' or it parses as local time
+    const duration = Math.round((Date.now() - new Date(ticket.called_at + 'Z').getTime()) / 60000);
 
     db.prepare(`
       UPDATE tickets SET
@@ -229,7 +231,8 @@ exports.cancel = (req, res) => {
 
 exports.transfer = (req, res) => {
   const { ticket_id } = req.params;
-  const { to_dept_id, reason, staff_id } = req.body;
+  const { to_dept_id, reason } = req.body;
+  const staff_id = req.user.user_id;
 
   try {
     const original = db.prepare('SELECT * FROM tickets WHERE ticket_id = ?').get(ticket_id);
