@@ -8,6 +8,8 @@ const ALL_PAGES = [
   { key: 'reception',             label: 'Reception — Create Tickets' },
   { key: 'queue',                 label: 'Queue Dashboard — Serve Tickets' },
   { key: 'all_queues',            label: 'All Queues — Cross-department view' },
+  { key: 'queue_control',         label: 'Queue Control — Skip / Transfer / Recall' },
+  { key: 'announcements',         label: 'Announcements — Manage display messages' },
   { key: 'reports',               label: 'Reports' },
   { key: 'reports_daily',         label: 'Daily Summary',       sub: true },
   { key: 'reports_service_types', label: 'Service Types',       sub: true },

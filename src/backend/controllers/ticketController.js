@@ -24,7 +24,7 @@ function generateTicketNumber(dept_code, date, priority) {
 
 function calculateWaitTime(dept_id) {
   const queueLength = db.prepare(
-    "SELECT COUNT(*) as count FROM tickets WHERE department_id = ? AND status = 'waiting'"
+    "SELECT COUNT(*) as count FROM tickets WHERE department_id = ? AND status = 'waiting' AND archived = 0"
   ).get(dept_id).count;
 
   const avgServiceTime = db.prepare(`

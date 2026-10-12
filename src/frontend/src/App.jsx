@@ -22,6 +22,7 @@ const AllQueues    = lazy(() => import('./pages/AllQueues'));
 const PublicDisplay = lazy(() => import('./pages/PublicDisplay'));
 const ServerSetup  = lazy(() => import('./pages/ServerSetup'));
 const Kiosk        = lazy(() => import('./pages/Kiosk'));
+const ScreenShell  = lazy(() => import('./pages/ScreenShell'));
 
 // ── Loading fallback ──────────────────────────────────────────────────────────
 function PageLoader() {
@@ -135,6 +136,18 @@ export default function App() {
           <Route path="/all-queues" element={
             <ProtectedRoute page="all_queues" roles={['super_admin', 'admin']}>
               <AllQueues />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/queue-control" element={
+            <ProtectedRoute page="queue_control" roles={['super_admin', 'admin']}>
+              <ScreenShell title="Queue Control"><QueueControl /></ScreenShell>
+            </ProtectedRoute>
+          } />
+
+          <Route path="/announcements" element={
+            <ProtectedRoute page="announcements" roles={['super_admin', 'admin']}>
+              <ScreenShell title="Announcements"><Announcements /></ScreenShell>
             </ProtectedRoute>
           } />
 

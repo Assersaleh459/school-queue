@@ -8,7 +8,7 @@ exports.getDisplayData = (req, res) => {
        'Counter ' || d.display_order as counter
      FROM tickets t
      JOIN departments d ON t.department_id = d.department_id
-     WHERE t.status = 'called'
+     WHERE t.status = 'called' AND t.archived = 0
      ORDER BY t.called_at DESC`
   ).all();
 
@@ -16,7 +16,7 @@ exports.getDisplayData = (req, res) => {
     `SELECT d.name, d.code, d.color_code,
        COUNT(t.ticket_id) as waiting
      FROM departments d
-     LEFT JOIN tickets t ON d.department_id = t.department_id AND t.status = 'waiting'
+     LEFT JOIN tickets t ON d.department_id = t.department_id AND t.status = 'waiting' AND t.archived = 0
      WHERE d.is_active = 1
      GROUP BY d.department_id
      ORDER BY d.display_order`
@@ -41,7 +41,7 @@ exports.callNext = (req, res) => {
   try {
     const ticket = db.prepare(`
       SELECT * FROM tickets
-      WHERE department_id = ? AND status = 'waiting'
+      WHERE department_id = ? AND status = 'waiting' AND archived = 0
       ORDER BY
         CASE priority
           WHEN 'urgent' THEN 1

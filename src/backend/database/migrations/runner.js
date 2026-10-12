@@ -15,6 +15,12 @@ const MIGRATIONS = [
     id: '004_add_dept_room_number',
     sql: 'ALTER TABLE departments ADD COLUMN room_number TEXT DEFAULT NULL',
   },
+  {
+    // Archived tickets are hidden from live queues/display but kept for reports,
+    // so the queue can be reset for a new day without deleting report history.
+    id: '005_add_ticket_archived',
+    sql: 'ALTER TABLE tickets ADD COLUMN archived INTEGER DEFAULT 0',
+  },
 ];
 
 function runMigrations(db) {

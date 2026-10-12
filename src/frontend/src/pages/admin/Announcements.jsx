@@ -213,7 +213,7 @@ export default function Announcements() {
                   ].map(opt => (
                     <label
                       key={opt.value}
-                      className={`flex-1 text-center border-2 rounded-lg py-2 cursor-pointer text-sm font-semibold transition-all
+                      className={`relative flex-1 text-center border-2 rounded-lg py-2 cursor-pointer text-sm font-semibold transition-all
                         ${form.speak_language === opt.value
                           ? 'border-teal bg-teal bg-opacity-10 text-navy'
                           : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}

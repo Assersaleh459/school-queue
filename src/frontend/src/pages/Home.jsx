@@ -52,6 +52,24 @@ const TILES = [
     icon: '🗂️'
   },
   {
+    label: 'Queue Control',
+    description: 'Skip, transfer, recall and no-show tickets',
+    path: '/queue-control',
+    page: 'queue_control',
+    color: '#0891b2',
+    roles: ['super_admin', 'admin'],
+    icon: '🎛️'
+  },
+  {
+    label: 'Announcements',
+    description: 'Manage display announcements',
+    path: '/announcements',
+    page: 'announcements',
+    color: '#ca8a04',
+    roles: ['super_admin', 'admin'],
+    icon: '📢'
+  },
+  {
     label: 'Display Monitor',
     description: 'Public queue display screen',
     path: '/display',

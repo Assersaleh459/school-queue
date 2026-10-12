@@ -42,4 +42,11 @@ function initDatabase() {
 
 initDatabase();
 
+// Daily automatic backups (keeps last 14) — safe online copies of the DB file.
+try {
+  require('./backup').scheduleBackups(db);
+} catch (err) {
+  console.error('Backup scheduler not started:', err.message);
+}
+
 module.exports = db;

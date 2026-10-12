@@ -13,13 +13,13 @@ router.get('/current', (req, res) => {
         SELECT t.*, c.name as category_name
         FROM tickets t
         LEFT JOIN service_categories c ON t.category_id = c.category_id
-        WHERE t.department_id = ? AND t.status IN ('called', 'serving')
+        WHERE t.department_id = ? AND t.status IN ('called', 'serving') AND t.archived = 0
         ORDER BY t.called_at DESC LIMIT 1
       `).get(dept.department_id);
 
       const next = db.prepare(`
         SELECT * FROM tickets
-        WHERE department_id = ? AND status = 'waiting'
+        WHERE department_id = ? AND status = 'waiting' AND archived = 0
         ORDER BY
           CASE priority WHEN 'urgent' THEN 1 WHEN 'elderly' THEN 2 WHEN 'vip' THEN 3 ELSE 4 END,
           created_at ASC
@@ -27,7 +27,7 @@ router.get('/current', (req, res) => {
       `).get(dept.department_id);
 
       const waiting_count = db.prepare(
-        "SELECT COUNT(*) as count FROM tickets WHERE department_id = ? AND status = 'waiting'"
+        "SELECT COUNT(*) as count FROM tickets WHERE department_id = ? AND status = 'waiting' AND archived = 0"
       ).get(dept.department_id).count;
 
       display_data[dept.department_id] = {

@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS tickets (
   parent_session_id VARCHAR(50),
   transferred_from INTEGER,
   call_count INTEGER DEFAULT 0,
+  archived INTEGER DEFAULT 0,
   FOREIGN KEY (department_id) REFERENCES departments(department_id),
   FOREIGN KEY (category_id) REFERENCES service_categories(category_id),
   FOREIGN KEY (served_by_user_id) REFERENCES users(user_id)

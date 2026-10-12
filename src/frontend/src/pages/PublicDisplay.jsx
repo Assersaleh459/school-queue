@@ -96,7 +96,7 @@ export default function PublicDisplay() {
   // One AbortController per speak() call; aborting it stops audio + cancels speech
   const abortCtrl   = useRef(null);
   const speakQueue  = useRef([]);
-  const musicPaused = useRef(false); // guard: don't double-pause on rapid ticket calls
+  const musicPaused = useRef(false); // guard: pause external music once, resume once
 
   // drainQueue processes the queue sequentially, respecting the abort signal
   const drainQueue = useCallback(async (signal) => {
@@ -132,13 +132,15 @@ export default function PublicDisplay() {
     }
 
     const run = async () => {
-      // Pause music only once — if another ticket fires mid-announcement, skip re-pausing
+      // Pause external music once, before the announcement. Chromium's media-key
+      // capture is disabled (main.js) so this key reaches the music app, not our
+      // own TTS. If another ticket fires mid-announcement, don't re-pause.
       if (!musicPaused.current) {
         musicPaused.current = true;
         await window.electronAPI?.mediaPlayPause?.();
       }
       await drainQueue(ctrl.signal);
-      // Resume only when this announcement finishes naturally (not cut off by next ticket)
+      // Resume only when the announcement finishes naturally (not cut off).
       if (!ctrl.signal.aborted) {
         musicPaused.current = false;
         await window.electronAPI?.mediaPlayPause?.();

@@ -185,34 +185,8 @@ router.delete('/departments/:id/categories/:catId', requireRole('super_admin'), 
   }
 });
 
-// --- Announcements ---
-router.get('/announcements', (req, res) => {
-  const rows = db.prepare('SELECT * FROM announcements ORDER BY display_order').all();
-  res.json(rows);
-});
-
-router.post('/announcements', requireRole('super_admin'), rules.createAnnouncement, checkValidation, (req, res) => {
-  const { message_text, message_text_ar, speak_language, display_order, is_active } = req.body;
-  const result = db.prepare(
-    'INSERT INTO announcements (message_text, message_text_ar, speak_language, display_order, is_active) VALUES (?, ?, ?, ?, ?)'
-  ).run(message_text, message_text_ar || null, speak_language || 'en', display_order || 99, is_active ? 1 : 0);
-  log(req.user?.user_id, 'ANNOUNCEMENT_CREATED', 'announcement', result.lastInsertRowid, { message_text });
-  res.json({ success: true, announcement_id: result.lastInsertRowid });
-});
-
-router.put('/announcements/:id', requireRole('super_admin'), rules.updateAnnouncement, checkValidation, (req, res) => {
-  const { message_text, message_text_ar, speak_language, display_order, is_active } = req.body;
-  db.prepare(
-    'UPDATE announcements SET message_text=?, message_text_ar=?, speak_language=?, display_order=?, is_active=? WHERE announcement_id=?'
-  ).run(message_text, message_text_ar || null, speak_language || 'en', display_order, is_active ? 1 : 0, req.params.id);
-  res.json({ success: true });
-});
-
-router.delete('/announcements/:id', requireRole('super_admin'), (req, res) => {
-  db.prepare('DELETE FROM announcements WHERE announcement_id = ?').run(req.params.id);
-  log(req.user?.user_id, 'ANNOUNCEMENT_DELETED', 'announcement', parseInt(req.params.id));
-  res.json({ success: true });
-});
+// Announcement management moved to routes/announcements.js (screen-access gated,
+// so users granted the 'announcements' screen can manage them without full admin).
 
 // --- Export / Import ---
 router.get('/export/users', requireRole('super_admin'), (req, res) => {
@@ -265,6 +239,45 @@ router.post('/reset-tickets', requireRole('super_admin'), (req, res) => {
   } catch (error) {
     console.error('Reset tickets error:', error);
     res.status(500).json({ error: 'Failed to reset ticket data' });
+  }
+});
+
+// Resets the queue for a new day WITHOUT deleting anything: archives all current
+// tickets so they leave the live queues/display but stay in the DB for reports.
+router.post('/archive-tickets', requireRole('super_admin'), (req, res) => {
+  try {
+    const depts = db.prepare('SELECT department_id FROM departments').all();
+    const result = db.prepare('UPDATE tickets SET archived = 1 WHERE archived = 0').run();
+    log(req.user?.user_id, 'TICKETS_ARCHIVED', 'system', null, { archived: result.changes });
+    depts.forEach(d => req.io.to(`dept_${d.department_id}`).emit('queue_updated'));
+    req.io.emit('queue_updated');
+    res.json({ success: true, archived: result.changes });
+  } catch (error) {
+    console.error('Archive tickets error:', error);
+    res.status(500).json({ error: 'Failed to reset queue' });
+  }
+});
+
+// --- Backups ---
+const backup = require('../database/backup');
+
+router.post('/backup', requireRole('super_admin'), async (req, res) => {
+  try {
+    const dest = await backup.runBackup(db, 'manual');
+    backup.prune(db, 14);
+    log(req.user?.user_id, 'BACKUP_CREATED', 'system', null, { file: require('path').basename(dest) });
+    res.json({ success: true, file: require('path').basename(dest) });
+  } catch (error) {
+    console.error('Backup error:', error);
+    res.status(500).json({ error: 'Backup failed' });
+  }
+});
+
+router.get('/backups', requireRole('super_admin'), (req, res) => {
+  try {
+    res.json(backup.listBackups(db));
+  } catch {
+    res.status(500).json({ error: 'Failed to list backups' });
   }
 });
 

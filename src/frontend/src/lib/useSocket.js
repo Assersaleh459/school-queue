@@ -50,28 +50,31 @@ export function useSocket(departmentId, onQueueUpdate, onSettingsUpdated) {
 
 export function useMonitorSocket(onTicketCalled, onTicketRecalled) {
   useEffect(() => {
-    socket = io(window.location.origin, {
+    const sock = io(window.location.origin, {
       transports: ['websocket', 'polling']
       // no auth — public display screen
     });
+    socket = sock;
 
-    socket.on('connect', () => {
+    sock.on('connect', () => {
       console.log('✓ Monitor socket connected');
-      socket.emit('join_monitor');
+      sock.emit('join_monitor');
     });
 
-    socket.on('ticket_called', (data) => {
-      console.log('Ticket called:', data);
+    sock.on('connect_error', (err) => {
+      console.error('Monitor socket connect_error:', err.message);
+    });
+
+    sock.on('ticket_called', (data) => {
       if (onTicketCalled) onTicketCalled(data);
     });
 
-    socket.on('ticket_recalled', (data) => {
-      console.log('Ticket recalled:', data);
+    sock.on('ticket_recalled', (data) => {
       if (onTicketRecalled) onTicketRecalled(data);
     });
 
     return () => {
-      socket.disconnect();
+      sock.disconnect();
     };
   }, [onTicketCalled, onTicketRecalled]);
 
