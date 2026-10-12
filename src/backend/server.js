@@ -7,6 +7,7 @@ const dotenv = require('dotenv');
 const morgan = require('morgan');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
+const { startDiscoveryResponder } = require('./discovery');
 
 dotenv.config();
 
@@ -63,6 +64,7 @@ const announcementRoutes = require('./routes/announcements');
 const adminRoutes = require('./routes/admin');
 const reportRoutes = require('./routes/reports');
 const kioskRoutes = require('./routes/kiosk');
+const { getSetting } = require('./settingsCache');
 
 const socketHandlers = require('./socket/handlers');
 socketHandlers(io);
@@ -119,22 +121,36 @@ app.use(errorHandler);
 const BASE_PORT = parseInt(process.env.PORT) || 3000;
 
 function tryListen(port) {
-  server.listen(port, () => {
-    process.env.ACTUAL_PORT = String(port);
-    if (port !== BASE_PORT) {
-      console.warn(`Port ${BASE_PORT} was in use — bound to http://localhost:${port} instead`);
-    } else {
-      console.log(`✓ Server running on http://localhost:${port}`);
-    }
-  });
+  server.listen(port);
 }
+
+// One handler, not a listen() callback per attempt: those pile up across retries
+// and ALL fire on the final success — the stale ones with the busy port.
+server.on('listening', () => {
+  const port = server.address().port;
+  process.env.ACTUAL_PORT = String(port);
+  if (port !== BASE_PORT) {
+    console.warn(`Port ${BASE_PORT} was in use — bound to http://localhost:${port} instead`);
+  } else {
+    console.log(`✓ Server running on http://localhost:${port}`);
+  }
+  startDiscoveryResponder(() => ({
+    port,
+    school: getSetting('school_name', 'SchoolQ'),
+    version: require('../../package.json').version,
+  }));
+});
 
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
     const taken = err.port;
     const next  = taken + 1;
     if (next > BASE_PORT + 10) {
-      console.error(`Could not find a free port in range ${BASE_PORT}–${BASE_PORT + 10}. Giving up.`);
+      const msg = `Ports ${BASE_PORT}–${BASE_PORT + 10} are all in use by other programs.`;
+      console.error(`${msg} Giving up.`);
+      // Inside the desktop app, exiting here would close it with no message —
+      // hand the error to electron/main.js to show instead.
+      if (process.versions.electron) { process.env.SERVER_START_ERROR = msg; return; }
       process.exit(1);
     }
     console.warn(`Port ${taken} is already in use — trying ${next}…`);

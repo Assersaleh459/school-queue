@@ -64,6 +64,19 @@
     font-size: 13px; padding: 10px;
   }
   #status { margin-bottom: 14px; font-size: 13px; font-weight: 600; text-align: center; min-height: 20px; }
+  .btn-find { background: #19224A; color: #fff; margin-bottom: 10px; font-size: 13px; padding: 10px; }
+  .btn:disabled { opacity: 0.6; cursor: default; }
+  #found-list { margin-bottom: 16px; }
+  .found-item {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    width: 100%; text-align: left; background: #fff; cursor: pointer;
+    border: 1.5px solid #e5e7eb; border-radius: 8px; padding: 10px 14px; margin-top: 6px;
+    font: inherit; color: inherit; transition: border-color 0.15s, background 0.15s;
+  }
+  .found-item:hover { border-color: #5FAEB6; background: #f0faf9; }
+  .found-item.selected { border-color: #5FAEB6; background: #e6f7f8; }
+  .found-name { font-size: 14px; font-weight: 700; }
+  .found-addr { font-size: 12px; color: #6b7280; font-family: Consolas, monospace; white-space: nowrap; }
   .ok   { color: #059669; }
   .err  { color: #dc2626; }
   .info { color: #2563eb; }
@@ -97,10 +110,12 @@
   </div>
 
   <div id="client-section">
+    <button class="btn btn-find" id="find-btn" onclick="findServers()">🔍 Find Server on Network</button>
+    <div id="found-list"></div>
     <div class="field">
       <label for="server-ip">Server IP Address</label>
       <input type="text" id="server-ip" placeholder="e.g. 192.168.1.5" />
-      <div class="hint">Enter the IP address shown on the server machine.</div>
+      <div class="hint">Pick a server above, or type its IP. Add <b>:port</b> if it isn't on 3000 (e.g. 192.168.1.5:3001).</div>
     </div>
     <button class="btn btn-test" onclick="testConnection()">Test Connection</button>
   </div>
@@ -152,22 +167,74 @@
       selectMode(cfg.mode || 'server');
       if (cfg.mode === 'client') {
         const url = new URL(cfg.serverUrl);
-        document.getElementById('server-ip').value = url.hostname;
+        document.getElementById('server-ip').value = formatAddress(url.hostname, url.port || 3000);
       }
     }
+
+    // Staff PCs usually don't know the server's IP — look for it straight away.
+    if (mode === 'client') findServers();
   });
 
+  // "192.168.1.5" or "192.168.1.5:3001" → { host, port }
+  function parseAddress(value) {
+    const [host, port] = value.trim().split(':');
+    return { host, port: parseInt(port) || 3000 };
+  }
+
+  function formatAddress(host, port) {
+    return Number(port) === 3000 ? host : `${host}:${port}`;
+  }
+
+  async function findServers() {
+    const btn  = document.getElementById('find-btn');
+    const list = document.getElementById('found-list');
+    btn.disabled = true;
+    btn.textContent = 'Searching the network…';
+    list.replaceChildren();
+
+    const servers = await window.electronAPI.discoverServers();
+
+    btn.disabled = false;
+    btn.textContent = '🔍 Search Again';
+    if (servers.length === 0) {
+      setStatus('No SchoolQ Server found. Make sure it is running, or type its IP below.', 'err');
+      return;
+    }
+    setStatus(`Found ${servers.length} server${servers.length > 1 ? 's' : ''} — click one to use it.`, 'info');
+
+    for (const s of servers) {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'found-item';
+      const name = document.createElement('span');
+      name.className = 'found-name';
+      name.textContent = (s.school || 'SchoolQ Server') + (s.thisPC ? ' (this PC)' : '');
+      const addr = document.createElement('span');
+      addr.className = 'found-addr';
+      addr.textContent = `${s.ip}:${s.port}`;
+      item.append(name, addr);
+      item.onclick = () => {
+        document.getElementById('server-ip').value = formatAddress(s.ip, s.port);
+        list.querySelectorAll('.found-item').forEach(el => el.classList.toggle('selected', el === item));
+        setStatus(`Selected ${s.school || 'server'} at ${s.ip}:${s.port}`, 'ok');
+      };
+      list.append(item);
+    }
+    // One server and nothing typed yet — pick it for them.
+    if (servers.length === 1 && !document.getElementById('server-ip').value.trim()) list.firstChild.click();
+  }
+
   async function testConnection() {
-    const ip = document.getElementById('server-ip').value.trim();
-    if (!ip) { setStatus('Please enter a server IP address.', 'err'); return; }
+    const { host, port } = parseAddress(document.getElementById('server-ip').value);
+    if (!host) { setStatus('Please enter a server IP address.', 'err'); return; }
     setStatus('Testing connection…', 'info');
     // Test from the main process: a fetch() from this file:// page has origin 'null',
     // which the server's CORS rejects, so it always failed even when the server was up.
-    const res = await window.electronAPI.testServer(ip, 3000);
+    const res = await window.electronAPI.testServer(host, port);
     if (res.ok) {
-      setStatus('✓ Connected successfully!', 'ok');
+      setStatus(`✓ Connected to SchoolQ at ${host}:${port}`, 'ok');
     } else {
-      setStatus('✗ Could not reach the server. Check the IP and make sure SchoolQ is running on the server machine.', 'err');
+      setStatus(`✗ No SchoolQ Server at ${host}:${port}. Check the address and make sure SchoolQ is running on the server machine.`, 'err');
     }
   }
 
@@ -175,9 +242,9 @@
     let serverUrl = 'http://localhost:3000';
 
     if (mode === 'client') {
-      const ip = document.getElementById('server-ip').value.trim();
-      if (!ip) { setStatus('Please enter the server IP address.', 'err'); return; }
-      serverUrl = `http://${ip}:3000`;
+      const { host, port } = parseAddress(document.getElementById('server-ip').value);
+      if (!host) { setStatus('Please enter the server IP address.', 'err'); return; }
+      serverUrl = `http://${host}:${port}`;
     }
 
     window.electronAPI.saveConfig({ mode, serverUrl });

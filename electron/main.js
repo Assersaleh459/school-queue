@@ -3,9 +3,9 @@ const path   = require('path');
 const fs     = require('fs');
 const net    = require('net');
 const os     = require('os');
-const http   = require('http');
 const crypto = require('crypto');
 const license = require('./license');
+const { discoverServers, testServer, findServer } = require('./discovery');
 
 Menu.setApplicationMenu(null);
 
@@ -140,18 +140,8 @@ ipcMain.handle('restore-database', async () => {
   }
 });
 
-ipcMain.handle('test-server', (e, ip, port = 3000) => new Promise(resolve => {
-  const req = http.get(
-    { host: ip, port: parseInt(port) || 3000, path: '/api/settings/public', timeout: 5000 },
-    res => {
-      let data = '';
-      res.on('data', d => data += d);
-      res.on('end', () => { try { JSON.parse(data); resolve({ ok: true }); } catch { resolve({ ok: false }); } });
-    }
-  );
-  req.on('error', () => resolve({ ok: false }));
-  req.on('timeout', () => { req.destroy(); resolve({ ok: false }); });
-}));
+ipcMain.handle('test-server', (e, ip, port) => testServer(ip, port));
+ipcMain.handle('discover-servers', () => discoverServers());
 
 // ── Network helpers ───────────────────────────────────────────────────────────
 
@@ -160,22 +150,6 @@ function isPortListening(port, host = '127.0.0.1') {
     const s = new net.Socket();
     s.connect(port, host, () => { s.destroy(); resolve(true); });
     s.on('error', () => { s.destroy(); resolve(false); });
-  });
-}
-
-function waitForServer(port, host, timeoutMs = 20000) {
-  return new Promise((resolve, reject) => {
-    const deadline = Date.now() + timeoutMs;
-    const try_ = () => {
-      if (Date.now() > deadline) {
-        reject(new Error(`Cannot reach ${host}:${port} after ${timeoutMs / 1000}s`));
-        return;
-      }
-      const s = new net.Socket();
-      s.connect(port, host, () => { s.destroy(); resolve(); });
-      s.on('error', () => { s.destroy(); setTimeout(try_, 500); });
-    };
-    try_();
   });
 }
 
@@ -222,6 +196,12 @@ function waitForActualServer(timeoutMs = 30000) {
     const check = () => {
       const port = process.env.ACTUAL_PORT ? parseInt(process.env.ACTUAL_PORT) : null;
       if (port && !isNaN(port)) { resolve(port); return; }
+      if (process.env.SERVER_START_ERROR) {
+        const err = new Error(process.env.SERVER_START_ERROR);
+        err.portsBusy = true;
+        reject(err);
+        return;
+      }
       if (Date.now() > deadline) { reject(new Error('Server did not start within 30 seconds')); return; }
       setTimeout(check, 200);
     };
@@ -312,22 +292,25 @@ app.on('ready', async () => {
       const port = await waitForActualServer(30000);
       createWindow(`http://localhost:${port}`);
     } else {
-      let url;
-      try { url = new URL(config.serverUrl); }
-      catch { url = new URL('http://localhost:3000'); }
-
-      try {
-        await waitForServer(parseInt(url.port) || 3000, url.hostname, 20000);
-        createWindow(config.serverUrl);
-      } catch {
+      const serverUrl = await findServer(config.serverUrl, 20000);
+      if (serverUrl) {
+        // Found it somewhere else (e.g. moved port) — remember the new address.
+        if (serverUrl !== config.serverUrl) saveConfig({ ...config, serverUrl });
+        createWindow(serverUrl);
+      } else {
         dialog.showErrorBox(
           'Cannot Connect to Server',
-          `SchoolQ could not reach the server at:\n${config.serverUrl}\n\nMake sure the server machine is on and SchoolQ Server is running there, then restart this app.`
+          `SchoolQ could not reach the server at:\n${config.serverUrl}\n\nand found no SchoolQ Server on the network.\n\nMake sure the server machine is on and SchoolQ Server is running there, then restart this app.`
         );
         createWindow(`file://${path.join(__dirname, 'setup.html')}`);
       }
     }
   } catch (err) {
+    if (err.portsBusy) {
+      fatal('SchoolQ — Failed to Start',
+        `${err.message}\n\nClose one of those programs (or restart this PC), then start SchoolQ Server again.`);
+      return;
+    }
     fatal(
       'SchoolQ — Failed to Start',
       `SchoolQ could not start the server.\n\nError: ${err.message}\n\n${err.stack || ''}\n\nTry restarting the app. If the problem persists, contact support.`

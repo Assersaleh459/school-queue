@@ -10,6 +10,8 @@ export default function ServerSetup() {
   const [serverPort, setServerPort] = useState('3000');
   const [localIPs, setLocalIPs] = useState([]);
   const [status, setStatus]     = useState(null); // { type: 'ok'|'err'|'info', msg }
+  const [found, setFound]       = useState(null); // null = not searched yet
+  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
     if (!api) return;
@@ -26,6 +28,23 @@ export default function ServerSetup() {
     }
     setLocalIPs(api.getLocalIPs());
   }, []);
+
+  const findServers = async () => {
+    setSearching(true);
+    setStatus({ type: 'info', msg: 'Searching the network…' });
+    const servers = await api.discoverServers();
+    setFound(servers);
+    setSearching(false);
+    setStatus(servers.length
+      ? { type: 'info', msg: `Found ${servers.length} server${servers.length > 1 ? 's' : ''} — click one to use it.` }
+      : { type: 'err', msg: 'No SchoolQ Server found. Make sure it is running, or enter its IP and port below.' });
+  };
+
+  const pickServer = (s) => {
+    setServerIp(s.ip);
+    setServerPort(String(s.port));
+    setStatus({ type: 'ok', msg: `Selected ${s.school || 'server'} at ${s.ip}:${s.port}` });
+  };
 
   const testConnection = async () => {
     const ip   = serverIp.trim();
@@ -117,6 +136,32 @@ export default function ServerSetup() {
         {/* Client mode: enter server IP + port */}
         {mode === 'client' && (
           <div className="mb-6 space-y-3">
+            <button
+              onClick={findServers}
+              disabled={searching}
+              className="w-full py-3 bg-navy text-white rounded-xl text-sm font-bold hover:bg-opacity-90 transition-opacity disabled:opacity-60"
+            >
+              {searching ? 'Searching the network…' : found ? '🔍 Search Again' : '🔍 Find Server on Network'}
+            </button>
+            {found?.length > 0 && (
+              <div className="space-y-2">
+                {found.map(s => {
+                  const selected = serverIp === s.ip && serverPort === String(s.port);
+                  return (
+                    <button
+                      key={`${s.ip}:${s.port}`}
+                      onClick={() => pickServer(s)}
+                      className={`w-full flex justify-between items-center gap-3 text-left border-2 rounded-xl px-4 py-3 transition-colors ${
+                        selected ? 'border-teal bg-teal bg-opacity-5' : 'border-gray-200 hover:border-teal'
+                      }`}
+                    >
+                      <span className="font-bold text-navy">{s.school || 'SchoolQ Server'}{s.thisPC ? ' (this PC)' : ''}</span>
+                      <span className="text-xs text-gray-500 font-mono whitespace-nowrap">{s.ip}:{s.port}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             <div>
               <label className="block text-sm font-semibold text-navy mb-2">Server IP Address</label>
               <input

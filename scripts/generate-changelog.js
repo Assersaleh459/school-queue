@@ -255,7 +255,7 @@ const metaRows = [
   ['Product',      'SchoolQ — Queue Management System'],
   ['Client',       'Al-Noor International School'],
   ['Generated',    new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })],
-  ['Versions',     'v1.2.0 → v1.5.50  (32 releases)'],
+  ['Versions',     'v1.2.0 → v1.6.0  (33 releases)'],
 ];
 metaRows.forEach(([k, v], i) => {
   doc.fontSize(8.5).fillColor(C.teal).font('Helvetica-Bold').text(k, 74, 295 + i * 13, { lineBreak: false, width: 90 });
@@ -294,6 +294,7 @@ const idx = [
   { v:'1.5.48', date:'12 Oct 2026', label:'Timezone & Ticket Numbering Fixes',   type:'fix'      },
   { v:'1.5.49', date:'12 Oct 2026', label:'New License Signing Key',             type:'security' },
   { v:'1.5.50', date:'13 Oct 2026', label:'Staff Setup Test Connection Fix',     type:'fix'      },
+  { v:'1.6.0',  date:'13 Oct 2026', label:'LAN Server Discovery & Port Conflicts', type:'minor'  },
 ];
 const typeBadgeColors = {
   initial:'#3B82F6', patch:'#16A34A', security:'#DC2626',
@@ -1420,6 +1421,33 @@ fileTable([
 ]);
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  v1.6.0 — LAN SERVER DISCOVERY & PORT CONFLICT HANDLING
+// ─────────────────────────────────────────────────────────────────────────────
+versionHeader({
+  version: '1.6.0', date: '13 Oct 2026', type: 'minor',
+  commit: 'this release',
+  summary: 'Staff PCs Find the Server Automatically — Even When It Moved Port',
+  stats: { files: 12, added: 357, removed: 61 },
+});
+bullet('Server answers a UDP discovery probe (port 41234) with school name, version and the HTTP port it actually bound');
+bullet('Staff setup + in-app Server Settings: "Find Server on Network" — lists servers, click to use; auto-searches on first run');
+sub('One server found → selected automatically; manual entry accepts IP:port (e.g. 192.168.1.5:3001)');
+bullet('Staff startup self-heals: if the saved server does not answer as SchoolQ, it searches the LAN and saves the new address');
+bullet('Connection checks now verify the reply is SchoolQ — before, any program listening on the port passed');
+sub('With another app on 3000 and SchoolQ on 3001, Staff used to load the other app\'s page');
+bullet('Fixed: after a port retry, stale listen() callbacks also fired — the server announced the busy port');
+bullet('All ports 3000–3010 busy: clear error dialog instead of the app silently closing');
+fileTable([
+  { path: 'electron/discovery.js',                         added: 105, removed: 0, note: 'NEW — discover, testServer, findServer' },
+  { path: 'src/backend/discovery.js',                      added: 26, removed: 0,  note: 'NEW — UDP responder' },
+  { path: 'src/backend/server.js',                         added: 25, removed: 9,  note: 'Single listening handler, responder, ports-busy' },
+  { path: 'electron/main.js',                              added: 21, removed: 38, note: 'Self-healing Staff startup, IPC' },
+  { path: 'electron/setup.html',                           added: 77, removed: 10, note: 'Find Server UI, IP:port' },
+  { path: 'src/frontend/src/pages/ServerSetup.jsx',        added: 45, removed: 0,  note: 'Find Server UI' },
+  { path: 'src/backend/tests/discovery.test.js',           added: 53, removed: 0,  note: 'NEW — 4 real-UDP tests' },
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  SUMMARY PAGE
 // ─────────────────────────────────────────────────────────────────────────────
 newPage();
@@ -1462,6 +1490,7 @@ const timeline = [
   { v:'v1.5.48', date:'12 Oct 2026', type:'fix',      desc:'Timezone-correct service times & clocks, no duplicate numbers after skip' },
   { v:'v1.5.49', date:'12 Oct 2026', type:'security', desc:'New license signing keypair (old private key unavailable)' },
   { v:'v1.5.50', date:'13 Oct 2026', type:'fix',      desc:'Staff first-time setup: Test Connection works (CORS-free IPC check)' },
+  { v:'v1.6.0',  date:'13 Oct 2026', type:'minor',    desc:'LAN server discovery, self-healing Staff startup, port-conflict handling' },
 ];
 const tc = { initial:C.navy, patch:C.green, security:C.red, fix:C.amber, minor:C.blue, ux:C.purple };
 timeline.forEach((r, i) => {
@@ -1478,7 +1507,7 @@ timeline.forEach((r, i) => {
 
 sectionTitle('Cumulative Change Statistics');
 const stats = [
-  ['Total versions released',      '32 (v1.2.0 → v1.5.50)'],
+  ['Total versions released',      '33 (v1.2.0 → v1.6.0)'],
   ['Total git commits',            '25+ commits on main branch'],
   ['Total files ever modified',    '~80 unique files touched'],
   ['Lines added across all commits','~22,000+'],
@@ -1487,7 +1516,7 @@ const stats = [
   ['Frontend files modified',      '~30 (pages, components, stores, hooks)'],
   ['New files created',            '13 (audit.js, settingsCache.js, validate.js, errorHandler.js,\n                         runner.js, Toast.jsx, useToastStore.js, 2 new pages, 3 test files, scripts/)'],
   ['Files deleted',                '2 (AdminPanel.jsx, DisplayMonitor.jsx — legacy)'],
-  ['Test coverage',                '26 tests — auth, ticket validation, middleware rules, queue logic'],
+  ['Test coverage',                '30 tests — auth, ticket validation, middleware rules, queue logic, LAN discovery'],
   ['Supported platforms',          'Windows 10/11 x64 (Electron 41)'],
   ['Node.js runtime (backend)',    'Electron bundled Node (v24-based, ABI 145)'],
 ];
@@ -1503,7 +1532,7 @@ const mat = [
   { area:'Database Design',            grade:'B',  color:C.teal,   note:'WAL, foreign keys, 10 indexes, migration runner, transactions' },
   { area:'Real-time Features',         grade:'A-', color:C.green,  note:'Socket.io with auth, force-logout events, dept rooms, user tracking' },
   { area:'Logging & Audit',            grade:'C+', color:C.amber,  note:'Audit log table + morgan; no structured logging, no rotation' },
-  { area:'Testing',                    grade:'C+', color:C.amber,  note:'26 unit tests; E2E run manually, not automated; no CI pipeline' },
+  { area:'Testing',                    grade:'C+', color:C.amber,  note:'30 unit tests; E2E run manually, not automated; no CI pipeline' },
   { area:'Code Organization',          grade:'B+', color:C.green,  note:'Clean route/controller split, Zustand, API layer, no fat controllers' },
   { area:'User Experience',            grade:'B',  color:C.teal,   note:'Toast system, skeleton loaders, real-time updates, bilingual voice' },
   { area:'Build & Deployment',         grade:'B-', color:C.amber,  note:'2 installer targets, per-install secret; no auto-update, no code signing' },
