@@ -255,7 +255,7 @@ const metaRows = [
   ['Product',      'SchoolQ — Queue Management System'],
   ['Client',       'Al-Noor International School'],
   ['Generated',    new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })],
-  ['Versions',     'v1.2.0 → v1.5.48  (30 releases)'],
+  ['Versions',     'v1.2.0 → v1.5.50  (32 releases)'],
 ];
 metaRows.forEach(([k, v], i) => {
   doc.fontSize(8.5).fillColor(C.teal).font('Helvetica-Bold').text(k, 74, 295 + i * 13, { lineBreak: false, width: 90 });
@@ -292,6 +292,8 @@ const idx = [
   { v:'1.5.46', date:'04 Jul 2026', label:'Archival, Backups & Licensing',       type:'minor'    },
   { v:'1.5.47', date:'12 Oct 2026', label:'Branch Merge (v1.5.36 + v1.5.46)',    type:'patch'    },
   { v:'1.5.48', date:'12 Oct 2026', label:'Timezone & Ticket Numbering Fixes',   type:'fix'      },
+  { v:'1.5.49', date:'12 Oct 2026', label:'New License Signing Key',             type:'security' },
+  { v:'1.5.50', date:'13 Oct 2026', label:'Staff Setup Test Connection Fix',     type:'fix'      },
 ];
 const typeBadgeColors = {
   initial:'#3B82F6', patch:'#16A34A', security:'#DC2626',
@@ -1385,6 +1387,39 @@ fileTable([
 ]);
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  v1.5.49 — NEW LICENSE SIGNING KEY
+// ─────────────────────────────────────────────────────────────────────────────
+versionHeader({
+  version: '1.5.49', date: '12 Oct 2026', type: 'security',
+  commit: 'this release',
+  summary: 'License Signing Keypair Replaced',
+  stats: { files: 7, added: 1, removed: 1 },
+});
+bullet('The original private signing key was not available on the build machine, so a new Ed25519 keypair was generated');
+bullet('electron/license.js now embeds the new public key — license keys minted with the old key no longer activate on 1.5.49+');
+sub('Already-activated installs on an older version are unaffected until they upgrade; then they need a key from the new private key');
+bullet('New private key stored in .keys/license-private.pem (gitignored, never shipped) — back it up offline');
+fileTable([
+  { path: 'electron/license.js',                           added: 1,  removed: 1,  note: 'New PUBLIC_KEY' },
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  v1.5.50 — STAFF SETUP TEST CONNECTION FIX
+// ─────────────────────────────────────────────────────────────────────────────
+versionHeader({
+  version: '1.5.50', date: '13 Oct 2026', type: 'fix',
+  commit: 'this release',
+  summary: 'First-Time Setup "Test Connection" No Longer Fails Against a Running Server',
+  stats: { files: 1, added: 6, removed: 8 },
+});
+bullet('Test Connection always reported "Could not reach the server", even though Save & Launch connected fine');
+bullet('Cause: the setup page is a file:// page (origin "null"); its fetch() was blocked by the server\'s CORS rules');
+bullet('Fix: test via the existing main-process testServer() IPC (Node http — no CORS), same check ServerSetup.jsx uses');
+fileTable([
+  { path: 'electron/setup.html',                           added: 6,  removed: 8,  note: 'testConnection() uses electronAPI.testServer' },
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  SUMMARY PAGE
 // ─────────────────────────────────────────────────────────────────────────────
 newPage();
@@ -1425,6 +1460,8 @@ const timeline = [
   { v:'v1.5.46', date:'04 Jul 2026', type:'minor',    desc:'New-day archival, automatic backups, offline license activation' },
   { v:'v1.5.47', date:'12 Oct 2026', type:'patch',    desc:'Merge of unpushed v1.5.36 work into the v1.5.46 line' },
   { v:'v1.5.48', date:'12 Oct 2026', type:'fix',      desc:'Timezone-correct service times & clocks, no duplicate numbers after skip' },
+  { v:'v1.5.49', date:'12 Oct 2026', type:'security', desc:'New license signing keypair (old private key unavailable)' },
+  { v:'v1.5.50', date:'13 Oct 2026', type:'fix',      desc:'Staff first-time setup: Test Connection works (CORS-free IPC check)' },
 ];
 const tc = { initial:C.navy, patch:C.green, security:C.red, fix:C.amber, minor:C.blue, ux:C.purple };
 timeline.forEach((r, i) => {
@@ -1441,7 +1478,7 @@ timeline.forEach((r, i) => {
 
 sectionTitle('Cumulative Change Statistics');
 const stats = [
-  ['Total versions released',      '30 (v1.2.0 → v1.5.48)'],
+  ['Total versions released',      '32 (v1.2.0 → v1.5.50)'],
   ['Total git commits',            '25+ commits on main branch'],
   ['Total files ever modified',    '~80 unique files touched'],
   ['Lines added across all commits','~22,000+'],

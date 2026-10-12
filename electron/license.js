@@ -10,7 +10,7 @@ const os = require('os');
 const { execSync } = require('child_process');
 
 const PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
-MCowBQYDK2VwAyEAlZqWiHMoaXiwxSVyM04Q6QaoQspvnQUr6uSGpszqkGk=
+MCowBQYDK2VwAyEAz4ghMS505i//hZvy9iW4TJt7jXWsEun/hP2mfRioqcU=
 -----END PUBLIC KEY-----`;
 
 // Canonical message that gets signed — must match tools/generate-license.js exactly.

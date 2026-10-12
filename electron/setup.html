@@ -161,14 +161,12 @@
     const ip = document.getElementById('server-ip').value.trim();
     if (!ip) { setStatus('Please enter a server IP address.', 'err'); return; }
     setStatus('Testing connection…', 'info');
-    try {
-      const res = await fetch(`http://${ip}:3000/health`, { signal: AbortSignal.timeout(5000) });
-      if (res.ok) {
-        setStatus('✓ Connected successfully!', 'ok');
-      } else {
-        setStatus('Server responded but returned an error.', 'err');
-      }
-    } catch {
+    // Test from the main process: a fetch() from this file:// page has origin 'null',
+    // which the server's CORS rejects, so it always failed even when the server was up.
+    const res = await window.electronAPI.testServer(ip, 3000);
+    if (res.ok) {
+      setStatus('✓ Connected successfully!', 'ok');
+    } else {
       setStatus('✗ Could not reach the server. Check the IP and make sure SchoolQ is running on the server machine.', 'err');
     }
   }
