@@ -18,7 +18,7 @@ router.post('/ticket', (req, res) => {
     const estimated_wait = calculateWaitTime(department_id);
     const ticket = createTicketTx(dept, cat_id, parent_name.trim(), student_name?.trim() || null, null, null, null, 'regular');
 
-    req.io.to(`dept_${department_id}`).emit('queue_updated');
+    req.io.to(`dept_${department_id}`).to('public_monitor').emit('queue_updated');
     log(null, 'KIOSK_TICKET_CREATED', 'ticket', ticket.ticket_id, {
       ticket_number: ticket.ticket_number,
       department: dept.name,

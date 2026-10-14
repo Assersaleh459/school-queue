@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 
 let socket;
@@ -48,7 +48,19 @@ export function useSocket(departmentId, onQueueUpdate, onSettingsUpdated) {
   return socket;
 }
 
-export function useMonitorSocket(onTicketCalled, onTicketRecalled) {
+// Public display socket (no auth). handlers: { <event>: fn } for
+//   ticket_called, ticket_recalled   — announce a call
+//   announcement_spoken              — admin pressed "Announce on display"
+//   queue_updated                    — a ticket changed → refresh the board now
+//   settings_updated, voice_updated, announcements_updated — reload that data now
+// Handlers live in a ref, so the socket connects once and always calls the latest ones.
+const MONITOR_EVENTS = ['ticket_called', 'ticket_recalled', 'announcement_spoken', 'queue_updated',
+  'settings_updated', 'voice_updated', 'announcements_updated'];
+
+export function useMonitorSocket(handlers) {
+  const ref = useRef(handlers);
+  ref.current = handlers;
+
   useEffect(() => {
     const sock = io(window.location.origin, {
       transports: ['websocket', 'polling']
@@ -65,18 +77,12 @@ export function useMonitorSocket(onTicketCalled, onTicketRecalled) {
       console.error('Monitor socket connect_error:', err.message);
     });
 
-    sock.on('ticket_called', (data) => {
-      if (onTicketCalled) onTicketCalled(data);
-    });
-
-    sock.on('ticket_recalled', (data) => {
-      if (onTicketRecalled) onTicketRecalled(data);
-    });
+    for (const ev of MONITOR_EVENTS) sock.on(ev, (data) => ref.current[ev]?.(data));
 
     return () => {
       sock.disconnect();
     };
-  }, [onTicketCalled, onTicketRecalled]);
+  }, []);
 
   return socket;
 }

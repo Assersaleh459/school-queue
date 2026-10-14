@@ -6,7 +6,7 @@
     "buildResources": "electron"
   },
   "extraMetadata": {
-    "version": "1.6.0"
+    "version": "1.10.0"
   },
   "extraResources": [
     {
@@ -20,6 +20,9 @@
     "src/frontend/dist/**/*",
     "config/**/*",
     "package.json"
+  ],
+  "asarUnpack": [
+    "src/backend/voice-engine/**"
   ],
   "win": {
     "target": ["nsis"],

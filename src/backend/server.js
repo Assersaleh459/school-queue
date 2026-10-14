@@ -64,10 +64,14 @@ const announcementRoutes = require('./routes/announcements');
 const adminRoutes = require('./routes/admin');
 const reportRoutes = require('./routes/reports');
 const kioskRoutes = require('./routes/kiosk');
+const voiceRoutes = require('./routes/voice');
 const { getSetting } = require('./settingsCache');
 
 const socketHandlers = require('./socket/handlers');
 socketHandlers(io);
+
+// New recordings are used immediately: displays and admin pages reload the clip list.
+voiceRoutes.engine.on('change', () => io.emit('voice_updated'));
 
 app.use((req, res, next) => {
   req.io = io;
@@ -85,6 +89,7 @@ app.use('/api/announcements', announcementRoutes);
 app.use('/api/admin', mutationLimiter, adminRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/kiosk', mutationLimiter, kioskRoutes);
+app.use('/api/voice', voiceRoutes);
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
@@ -93,7 +98,7 @@ app.get('/api/settings/public', (req, res) => {
   const db = require('./database/db');
   const keys = [
     'school_name', 'primary_color', 'working_hours_start', 'working_hours_end',
-    'announcement_language', 'audio_enabled',
+    'announcement_language', 'audio_enabled', 'voice_mode', 'media_pause', 'call_banner',
     'call_template_en', 'call_template_ar', 'recall_template_en', 'recall_template_ar',
     'no_show_after_calls', 'max_wait_alert_minutes', 'school_logo',
     'ticket_paper', 'ticket_footer', 'ticket_number_size',

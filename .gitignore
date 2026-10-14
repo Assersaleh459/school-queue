@@ -32,3 +32,6 @@ _claude_memory/
 # License signing keys — private key must NEVER be committed
 .keys/
 key-backup/
+
+# Python bytecode (voice tools)
+__pycache__/

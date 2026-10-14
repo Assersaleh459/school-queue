@@ -8,7 +8,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   relaunch:     ()       => ipcRenderer.send('relaunch'),
   testServer:      (ip, port) => ipcRenderer.invoke('test-server', ip, port),
   discoverServers: ()         => ipcRenderer.invoke('discover-servers'),
-  mediaPlayPause:  ()         => ipcRenderer.invoke('media-play-pause'),
+  mediaPause:      ()         => ipcRenderer.invoke('media-pause'),    // → { paused: n }
+  mediaResume:     ()         => ipcRenderer.invoke('media-resume'),
+  showBanner:      (data)     => ipcRenderer.send('banner-show', data),
+  hideBanner:      ()         => ipcRenderer.send('banner-hide'),
   openBackups:     ()         => ipcRenderer.invoke('open-backups'),
   restoreDatabase: ()         => ipcRenderer.invoke('restore-database'),
   licenseStatus:   ()         => ipcRenderer.sendSync('license-status'),

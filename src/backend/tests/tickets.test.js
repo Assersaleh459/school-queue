@@ -18,7 +18,7 @@ const jwt     = require('jsonwebtoken');
 
 const app = express();
 app.use(express.json());
-app.use((req, res, next) => { req.io = { to: () => ({ emit: () => {} }) }; next(); });
+app.use((req, res, next) => { const room = { to: () => room, emit: () => {} }; req.io = { to: () => room }; next(); });
 
 const ticketRoutes = require('../routes/tickets');
 app.use('/api/tickets', ticketRoutes);

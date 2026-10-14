@@ -29,6 +29,9 @@ export default function Admin() {
           <NavLink to="/admin/queue-control" className={({ isActive }) =>
             `flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-teal text-white' : 'text-gray-300 hover:bg-white hover:bg-opacity-10'}`
           }>Queue Control</NavLink>
+          <NavLink to="/admin/voice" className={({ isActive }) =>
+            `flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-teal text-white' : 'text-gray-300 hover:bg-white hover:bg-opacity-10'}`
+          }>Voice Recordings</NavLink>
           {user?.role === 'super_admin' && (
             <NavLink to="/admin/settings" className={({ isActive }) =>
               `flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-teal text-white' : 'text-gray-300 hover:bg-white hover:bg-opacity-10'}`

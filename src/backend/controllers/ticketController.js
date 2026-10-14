@@ -67,7 +67,7 @@ exports.create = (req, res) => {
     const estimated_wait = calculateWaitTime(department_id);
     const ticket = createTicketTx(dept, cat_id, parent_name, student_name, student_id, phone, purpose, priority || 'regular');
 
-    req.io.to(`dept_${department_id}`).emit('queue_updated');
+    req.io.to(`dept_${department_id}`).to('public_monitor').emit('queue_updated');
     log(req.user?.user_id, 'TICKET_CREATED', 'ticket', ticket.ticket_id, { ticket_number: ticket.ticket_number, department: dept.name, priority: ticket.priority });
 
     res.json({ success: true, ticket: { ...ticket, estimated_wait } });

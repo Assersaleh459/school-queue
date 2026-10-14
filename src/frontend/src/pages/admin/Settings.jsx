@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { adminAPI, settingsAPI } from '../../lib/api';
+import api, { adminAPI, settingsAPI } from '../../lib/api';
+import { DEFAULT_TEMPLATES, missingClips } from '../../lib/voiceClips';
 import { toast } from '../../store/useToastStore';
 import TicketReceipt from '../../components/TicketReceipt';
 import useAuthStore from '../../store/useAuthStore';
@@ -65,6 +66,21 @@ export default function Settings() {
       })
       .catch(() => {});
   }, []);
+
+  // Recorded (offline) voice: which template/department pieces have no clip yet
+  const [voiceClips, setVoiceClips]   = useState({});
+  const [voiceDepts, setVoiceDepts]   = useState([]);
+  useEffect(() => {
+    api.get('/voice/manifest').then(r => setVoiceClips(r.data || {})).catch(() => {});
+    adminAPI.getDepartments().then(r => setVoiceDepts(r.data.filter(d => d.is_active))).catch(() => {});
+  }, []);
+  const unrecorded = missingClips({
+    callEn:   settings.call_template_en   || DEFAULT_TEMPLATES.callEn,
+    recallEn: settings.recall_template_en || DEFAULT_TEMPLATES.recallEn,
+    callAr:   settings.call_template_ar   || DEFAULT_TEMPLATES.callAr,
+    recallAr: settings.recall_template_ar || DEFAULT_TEMPLATES.recallAr,
+  }, voiceDepts, voiceClips)
+    .filter(m => (settings.announcement_language || 'en') === 'both' || m.lang === (settings.announcement_language || 'en'));
 
   const set = (key, val) => setSettings(prev => ({ ...prev, [key]: val }));
 
@@ -346,6 +362,84 @@ export default function Settings() {
                   </label>
                 ))}
               </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Voice</label>
+              <div className="flex gap-3">
+                {[
+                  { value: 'recorded', label: 'Recorded voice', hint: 'Works offline — no internet needed' },
+                  { value: 'online',   label: 'Online voice',   hint: 'Reads any text — needs internet' },
+                ].map(opt => {
+                  const active = (settings.voice_mode || 'recorded') === opt.value;
+                  return (
+                    <label
+                      key={opt.value}
+                      className={`flex-1 border-2 rounded-xl py-3 px-4 cursor-pointer transition-all
+                        ${active ? 'border-teal bg-teal bg-opacity-10' : 'border-gray-200 hover:border-gray-300'}`}
+                    >
+                      <input
+                        type="radio"
+                        name="voice_mode"
+                        value={opt.value}
+                        checked={active}
+                        onChange={e => set('voice_mode', e.target.value)}
+                        className="sr-only"
+                      />
+                      <span className={`block font-semibold text-sm ${active ? 'text-navy' : 'text-gray-500'}`}>{opt.label}</span>
+                      <span className="block text-xs text-gray-500 mt-0.5">{opt.hint}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              {(settings.voice_mode || 'recorded') === 'recorded' && (
+                unrecorded.length === 0
+                  ? <p className="text-xs text-green-700 mt-2">✓ Every part of your announcements has a recording.</p>
+                  : <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <p className="text-xs font-semibold text-amber-800 mb-1">
+                        {unrecorded.length} part{unrecorded.length > 1 ? 's have' : ' has'} no recording yet and will use the online voice (needs internet):
+                      </p>
+                      <ul className="text-xs text-amber-900 space-y-0.5">
+                        {unrecorded.map(m => (
+                          <li key={`${m.lang}:${m.text}`} dir={m.lang === 'ar' ? 'rtl' : 'ltr'}>
+                            <span className="font-mono text-amber-600">{m.lang.toUpperCase()}</span> {m.text}
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="text-xs text-amber-700 mt-2">Record them in Admin → Voice Recordings.</p>
+                    </div>
+              )}
+            </div>
+
+            {/* Display PC: other media + banner (SchoolQ desktop app only) */}
+            <div className="pt-2 border-t">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={settings.media_pause !== 'false'}
+                  onChange={e => set('media_pause', e.target.checked ? 'true' : 'false')}
+                  className="w-5 h-5 rounded"
+                />
+                <span className="font-semibold text-gray-700">Pause music / videos during calls and announcements</span>
+              </label>
+              <p className="text-xs text-gray-500 mt-1 ml-8">
+                Only media that is actually playing is paused, and only that is resumed afterwards.
+              </p>
+
+              <label className="block text-sm font-semibold text-gray-700 mt-4 mb-2">Show call banner on top of other apps</label>
+              <select
+                value={settings.call_banner || 'media'}
+                onChange={e => set('call_banner', e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal text-sm"
+              >
+                <option value="media">Only when a video or music is playing (recommended)</option>
+                <option value="always">Always</option>
+                <option value="never">Never</option>
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                A banner with the called ticket appears over whatever is on screen, then fades away. Both options work when
+                the display runs in the SchoolQ app on that PC (not in a web browser).
+              </p>
             </div>
           </div>
         </section>

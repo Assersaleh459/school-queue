@@ -108,4 +108,19 @@ export const reportsAPI = {
   getTicketLog:     (params) => api.get('/reports/ticket-log', { params }),
 };
 
+export const voiceAPI = {
+  manifest:   ()                    => api.get('/voice/manifest'),
+  engine:     ()                    => api.get('/voice/engine'),
+  generate:   (items, force = false, voice) => api.post('/voice/generate', { items, force, voice }),
+  pause:      ()                    => api.post('/voice/engine/pause'),
+  resume:     ()                    => api.post('/voice/engine/resume'),
+  remove:     (lang, text, voice)   => api.post('/voice/remove', { lang, text, voice }),
+  install:    ()                    => api.post('/voice/engine/install'),
+  announce:   (id)                  => api.post(`/voice/announce/${id}`),
+  voices:     ()                    => api.get('/voice/voices'),
+  prepare:    (name, items)         => api.post(`/voice/voices/${name}/prepare`, { items }),
+  use:        (name, forWhat = 'calls') => api.post(`/voice/voices/${name}/use`, { for: forWhat }),
+  sample:     (name)                => api.get(`/voice/voices/${name}/sample`, { responseType: 'blob' }),
+};
+
 export default api;

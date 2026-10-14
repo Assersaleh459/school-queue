@@ -6,6 +6,8 @@ const os     = require('os');
 const crypto = require('crypto');
 const license = require('./license');
 const { discoverServers, testServer, findServer } = require('./discovery');
+const { createMediaControl } = require('./mediaControl');
+const { createBanner } = require('./banner');
 
 Menu.setApplicationMenu(null);
 
@@ -38,8 +40,9 @@ if (!gotInstanceLock) app.quit();
 let mainWindow;
 const configPath = path.join(app.getPath('userData'), 'config.json');
 
-// Path to the media-key PowerShell script (written once at startup)
-let mediaKeyScript = null;
+// Pauses other apps' media during announcements; banner shown on top of it (display PC)
+const media = createMediaControl(app.getPath('userData'));
+const banner = createBanner();
 
 // ── Config helpers ────────────────────────────────────────────────────────────
 
@@ -86,16 +89,16 @@ ipcMain.on('license-status', (e) => {
 });
 ipcMain.handle('activate-license', (e, key) => license.activate(app.getPath('userData'), key));
 
-// Send Media Play/Pause key — pauses/resumes whatever audio app is playing
-ipcMain.handle('media-play-pause', () => new Promise(resolve => {
-  if (!mediaKeyScript) return resolve();
-  const { execFile } = require('child_process');
-  execFile('powershell',
-    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', mediaKeyScript],
-    { windowsHide: true },
-    () => resolve()
-  );
-}));
+// Media: pause only what is playing, resume only what we paused
+ipcMain.handle('media-pause',  () => media.pause());
+ipcMain.handle('media-resume', () => media.resume());
+
+// Call banner over other apps, on the same screen as the display window
+ipcMain.on('banner-show', (e, data) => {
+  const bounds = BrowserWindow.fromWebContents(e.sender)?.getBounds();
+  banner.show(data && typeof data === 'object' ? data : {}, bounds);
+});
+ipcMain.on('banner-hide', () => banner.hide());
 
 // ── Backups / Restore ─────────────────────────────────────────────────────────
 
@@ -229,7 +232,7 @@ function createWindow(url) {
 
   mainWindow.loadURL(url);
   mainWindow.once('ready-to-show', () => mainWindow.show());
-  mainWindow.on('closed', () => { mainWindow = null; });
+  mainWindow.on('closed', () => { mainWindow = null; banner.destroy(); });
 }
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
@@ -263,16 +266,8 @@ app.on('ready', async () => {
     return;
   }
 
-  // Write the media-key script to userData so it persists between launches
-  try {
-    mediaKeyScript = path.join(app.getPath('userData'), 'media-key.ps1');
-    fs.writeFileSync(mediaKeyScript,
-      'Add-Type -MemberDefinition \'[DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, int dwExtraInfo);\' -Name U32 -Namespace Win32 -PassThru | Out-Null\r\n' +
-      '[Win32.U32]::keybd_event(0xB3, 0, 0, 0)\r\n' +
-      '[Win32.U32]::keybd_event(0xB3, 0, 2, 0)\r\n',
-      'utf8'
-    );
-  } catch { mediaKeyScript = null; }
+  // Start the media helper now so the first announcement isn't delayed by it
+  media.warm();
 
   try {
     if (buildMode === 'server') {
@@ -319,3 +314,4 @@ app.on('ready', async () => {
 });
 
 app.on('window-all-closed', () => app.quit());
+app.on('will-quit', () => media.stop());

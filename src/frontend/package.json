@@ -1,11 +1,12 @@
 {"name": "frontend",
   "private": true,
-  "version": "1.6.0",
+  "version": "1.10.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "test": "node --test src/lib/voiceClips.test.js",
     "preview": "vite preview"
   },
   "dependencies": {

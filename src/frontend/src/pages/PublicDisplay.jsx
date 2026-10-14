@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { useMonitorSocket } from '../lib/useSocket';
+import { DEFAULT_TEMPLATES, buildPlan, announcementTexts, clipKey, phraseUrl } from '../lib/voiceClips';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -55,6 +56,29 @@ async function playTTS(text, lang, signal) {
   });
 }
 
+// ── Recorded clips (offline voice) ────────────────────────────────────────────
+// Clips are created up front so they buffer while earlier ones play — joins stay tight.
+
+function loadClip(src) {
+  const audio = new Audio(src);
+  audio.preload = 'auto';
+  return audio;
+}
+
+// Resolves on 'ended' (play() resolves when playback merely starts). A missing or
+// broken clip is skipped rather than stalling the call.
+function playClip(audio, signal) {
+  if (signal?.aborted) return Promise.resolve();
+  return new Promise((resolve) => {
+    const timeout = setTimeout(done, 8000); // hard failsafe
+    function done() { clearTimeout(timeout); resolve(); }
+    signal?.addEventListener('abort', () => { audio.pause(); audio.src = ''; done(); }, { once: true });
+    audio.addEventListener('ended', done, { once: true });
+    audio.addEventListener('error', done, { once: true });
+    audio.play().catch(done);
+  });
+}
+
 const AR_DIGITS = '٠١٢٣٤٥٦٧٨٩';
 function toArabicNumerals(str) {
   return String(str).replace(/[0-9]/g, d => AR_DIGITS[d]);
@@ -70,15 +94,6 @@ function applyVars(template, number, department, lang, departmentAr, room) {
     .replace(/{room}/g,       room || '');
 }
 
-// ── Defaults ─────────────────────────────────────────────────────────────────
-
-const DEFAULTS = {
-  callEn:   'Attention please. Number {ticket}, {department}. Please come to the counter.',
-  callAr:   'انتباه. رقم {ticket}، {department}. يرجى التوجه إلى الكاونتر.',
-  recallEn: 'Final call. Number {ticket}, {department}. Please come forward immediately.',
-  recallAr: 'آخر نداء. رقم {ticket}، {department}. يرجى التوجه فوراً.',
-};
-
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function PublicDisplay() {
@@ -91,68 +106,110 @@ export default function PublicDisplay() {
   const [announceLang, setAnnounceLang]   = useState('en');
 
   // All speak-relevant settings in a ref — avoids stale closures in socket handlers
-  const s = useRef({ announceLang: 'en', audioEnabled: true, ...DEFAULTS });
+  const s = useRef({ announceLang: 'en', audioEnabled: true, voiceMode: 'recorded', custom: {}, ...DEFAULT_TEMPLATES });
 
   // One AbortController per speak() call; aborting it stops audio + cancels speech
   const abortCtrl   = useRef(null);
   const speakQueue  = useRef([]);
-  const musicPaused = useRef(false); // guard: pause external music once, resume once
+  const mediaHeld       = useRef(false); // we paused (or checked) media for the current run of announcements
+  const mediaWasPlaying = useRef(false); // something was actually playing → show the banner, resume after
 
-  // drainQueue processes the queue sequentially, respecting the abort signal
+  // drainQueue processes the queue sequentially, respecting the abort signal.
+  // Items: { audio } recorded clip | { text, lang } TTS | { pause } gap between languages
   const drainQueue = useCallback(async (signal) => {
     while (speakQueue.current.length > 0 && !signal.aborted) {
       const item = speakQueue.current.shift();
-      await playTTS(item.text, item.lang, signal);
-      // Natural pause between language blocks when using "both"
-      if (!signal.aborted && speakQueue.current.length > 0) {
-        await sleep(700, signal);
-      }
+      if (item.pause)      await sleep(item.pause, signal);
+      else if (item.audio) await playClip(item.audio, signal);
+      else                 await playTTS(item.text, item.lang, signal);
     }
   }, []);
 
-  // speak() cancels any in-flight audio, then queues and plays new announcement
-  const speak = useCallback((ticketNumber, deptName, deptNameAr, recalled, roomNumber) => {
-    if (!s.current.audioEnabled) return;
-
+  // play() cancels any in-flight audio (ticket call or announcement), then plays the new items.
+  // In the SchoolQ desktop app it also pauses media that is actually playing (and only that),
+  // and shows a banner over it; both are undone when the last announcement finishes.
+  const play = useCallback((items, banner) => {
     abortCtrl.current?.abort();
     window.speechSynthesis?.cancel();
 
     const ctrl = new AbortController();
     abortCtrl.current = ctrl;
-    speakQueue.current = [];
-
-    const num   = parseInt(ticketNumber.split('-').pop()) || 0;
-    const langs = s.current.announceLang === 'both' ? ['en', 'ar'] : [s.current.announceLang];
-
-    for (const lang of langs) {
-      const tmpl = recalled
-        ? (lang === 'ar' ? s.current.recallAr : s.current.recallEn)
-        : (lang === 'ar' ? s.current.callAr   : s.current.callEn);
-      speakQueue.current.push({ text: applyVars(tmpl, num, deptName, lang, deptNameAr, roomNumber), lang });
-    }
+    speakQueue.current = items;
 
     const run = async () => {
-      // Pause external music once, before the announcement. Chromium's media-key
-      // capture is disabled (main.js) so this key reaches the music app, not our
-      // own TTS. If another ticket fires mid-announcement, don't re-pause.
-      if (!musicPaused.current) {
-        musicPaused.current = true;
-        await window.electronAPI?.mediaPlayPause?.();
+      const desktop = window.electronAPI;
+      // Pause once per run of announcements; a call that interrupts another keeps the hold.
+      if (!mediaHeld.current && s.current.mediaPause && desktop?.mediaPause) {
+        mediaHeld.current = true;
+        const r = await desktop.mediaPause().catch(() => null);
+        mediaWasPlaying.current = (r?.paused || 0) > 0;
       }
+      const mode = s.current.callBanner;
+      const showBanner = banner && desktop?.showBanner && (mode === 'always' || (mode !== 'never' && mediaWasPlaying.current));
+      if (showBanner) desktop.showBanner(banner);
+
       await drainQueue(ctrl.signal);
-      // Resume only when the announcement finishes naturally (not cut off).
+
+      // Only when the announcement finishes naturally — an interrupting call takes over
       if (!ctrl.signal.aborted) {
-        musicPaused.current = false;
-        await window.electronAPI?.mediaPlayPause?.();
+        if (showBanner) desktop.hideBanner?.();
+        if (mediaHeld.current) {
+          mediaHeld.current = false;
+          mediaWasPlaying.current = false;
+          await desktop?.mediaResume?.().catch(() => {});
+        }
       }
     };
     run();
   }, [drainQueue]);
 
+  // Ticket call / recall
+  const speak = useCallback((ticketNumber, deptName, deptNameAr, recalled, roomNumber) => {
+    if (!s.current.audioEnabled) return;
+
+    const num   = parseInt(ticketNumber.split('-').pop()) || 0;
+    const langs = s.current.announceLang === 'both' ? ['en', 'ar'] : [s.current.announceLang];
+    const items = [];
+
+    for (const lang of langs) {
+      const tmpl = recalled
+        ? (lang === 'ar' ? s.current.recallAr : s.current.recallEn)
+        : (lang === 'ar' ? s.current.callAr   : s.current.callEn);
+      // Natural pause between language blocks when using "both"
+      if (items.length) items.push({ pause: 700 });
+
+      if (s.current.voiceMode === 'online') {
+        items.push({ text: applyVars(tmpl, num, deptName, lang, deptNameAr, roomNumber), lang });
+        continue;
+      }
+      // Recorded voice: numbers + this school's clips; pieces without a recording use TTS
+      const department = lang === 'ar' && deptNameAr ? deptNameAr : deptName;
+      for (const item of buildPlan(tmpl, { number: num, department, room: roomNumber }, lang, s.current.custom)) {
+        items.push(item.src ? { audio: loadClip(item.src) } : { text: item.tts, lang });
+      }
+    }
+    play(items, { kind: 'call', ticket: ticketNumber, department: deptName, departmentAr: deptNameAr, room: roomNumber, final: !!recalled });
+  }, [play]);
+
+  // Admin pressed "Announce on display": the announcement voice's recording if there is one
+  const speakAnnouncement = useCallback((data) => {
+    if (!s.current.audioEnabled) return;
+    const voice = s.current.custom.announce || s.current.custom;
+    const items = [];
+    for (const t of announcementTexts({ message_text: data.text_en, message_text_ar: data.text_ar, speak_language: data.speak_language })) {
+      if (items.length) items.push({ pause: 700 });
+      const file = s.current.voiceMode !== 'online' && voice[t.lang]?.[clipKey(t.text)];
+      items.push(file ? { audio: loadClip(phraseUrl(voice, file)) } : { text: t.text, lang: t.lang });
+    }
+    play(items, { kind: 'announcement', text: data.text_en, textAr: data.text_ar });
+  }, [play]);
+
+  const loadVoice = useCallback(async () => {
+    try { const r = await axios.get('/api/voice/manifest'); s.current.custom = r.data || {}; } catch {}
+  }, []);
+
   const onCalled   = useCallback((data) => { fetchDisplayData(); speak(data.ticket_number, data.department_name, data.department_name_ar, false, data.department_room); }, [speak]);
   const onRecalled = useCallback((data) => { speak(data.ticket_number, data.department_name, data.department_name_ar, !!data.is_final, data.department_room); }, [speak]);
-
-  useMonitorSocket(onCalled, onRecalled);
 
   const applySettings = useCallback((data) => {
     if (data.school_name) setSchoolName(data.school_name);
@@ -161,11 +218,30 @@ export default function PublicDisplay() {
     s.current.announceLang = lang;
     setAnnounceLang(lang);
     if (data.audio_enabled !== undefined) s.current.audioEnabled = data.audio_enabled !== 'false';
+    s.current.voiceMode = data.voice_mode === 'online' ? 'online' : 'recorded';
+    s.current.mediaPause = data.media_pause !== 'false';
+    s.current.callBanner = ['always', 'never'].includes(data.call_banner) ? data.call_banner : 'media';
     if (data.call_template_en)   s.current.callEn   = data.call_template_en;
     if (data.call_template_ar)   s.current.callAr   = data.call_template_ar;
     if (data.recall_template_en) s.current.recallEn = data.recall_template_en;
     if (data.recall_template_ar) s.current.recallAr = data.recall_template_ar;
   }, []);
+
+  const loadSettings = useCallback(async () => {
+    try { const r = await axios.get('/api/settings/public'); applySettings(r.data); } catch {}
+    loadVoice();
+  }, [applySettings, loadVoice]);
+
+  // Everything refreshes the moment it changes; the timers below are only a safety net
+  useMonitorSocket({
+    ticket_called: onCalled,
+    ticket_recalled: onRecalled,
+    announcement_spoken: speakAnnouncement,
+    queue_updated: fetchDisplayData,
+    settings_updated: loadSettings,
+    voice_updated: loadVoice,
+    announcements_updated: fetchAnnouncements,
+  });
 
   useEffect(() => {
     // Preload browser voices so they're ready on first announcement
@@ -174,9 +250,6 @@ export default function PublicDisplay() {
       window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
     }
 
-    const loadSettings = async () => {
-      try { const r = await axios.get('/api/settings/public'); applySettings(r.data); } catch {}
-    };
     loadSettings();
     fetchDisplayData();
     fetchAnnouncements();
@@ -184,8 +257,9 @@ export default function PublicDisplay() {
     const t1 = setInterval(() => setCurrentTime(new Date()), 1000);
     const t2 = setInterval(fetchDisplayData,  10000);
     const t3 = setInterval(loadSettings,      30000);
-    return () => { clearInterval(t1); clearInterval(t2); clearInterval(t3); };
-  }, [applySettings]);
+    const t4 = setInterval(fetchAnnouncements, 60000);
+    return () => { clearInterval(t1); clearInterval(t2); clearInterval(t3); clearInterval(t4); };
+  }, [loadSettings]);
 
   async function fetchDisplayData() {
     try {

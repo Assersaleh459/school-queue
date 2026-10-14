@@ -38,7 +38,9 @@ function mockRes() {
   };
 }
 
-const io = { to: () => ({ emit: () => {} }) };
+// Chainable like socket.io: io.to(a).to(b).emit(...)
+const room = { to: () => room, emit: () => {} };
+const io = { to: () => room };
 const findRun = (re) => mockDb.runs.find(r => re.test(r.sql));
 
 beforeEach(() => {

@@ -31,6 +31,7 @@ router.post('/', canManage, rules.createAnnouncement, checkValidation, (req, res
   const result = db.prepare(
     'INSERT INTO announcements (message_text, message_text_ar, speak_language, display_order, is_active) VALUES (?, ?, ?, ?, ?)'
   ).run(message_text, message_text_ar || null, speak_language || 'en', display_order || 99, is_active ? 1 : 0);
+  req.io.emit('announcements_updated');   // displays refresh their ticker now
   log(req.user?.user_id, 'ANNOUNCEMENT_CREATED', 'announcement', result.lastInsertRowid, { message_text });
   res.json({ success: true, announcement_id: result.lastInsertRowid });
 });
@@ -40,12 +41,14 @@ router.put('/:id', canManage, rules.updateAnnouncement, checkValidation, (req, r
   db.prepare(
     'UPDATE announcements SET message_text=?, message_text_ar=?, speak_language=?, display_order=?, is_active=? WHERE announcement_id=?'
   ).run(message_text, message_text_ar || null, speak_language || 'en', display_order, is_active ? 1 : 0, req.params.id);
+  req.io.emit('announcements_updated');
   log(req.user?.user_id, 'ANNOUNCEMENT_UPDATED', 'announcement', parseInt(req.params.id), { message_text });
   res.json({ success: true });
 });
 
 router.delete('/:id', canManage, (req, res) => {
   db.prepare('DELETE FROM announcements WHERE announcement_id = ?').run(req.params.id);
+  req.io.emit('announcements_updated');
   log(req.user?.user_id, 'ANNOUNCEMENT_DELETED', 'announcement', parseInt(req.params.id));
   res.json({ success: true });
 });

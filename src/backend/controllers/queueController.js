@@ -68,7 +68,7 @@ exports.callNext = (req, res) => {
 
     const dept = db.prepare('SELECT * FROM departments WHERE department_id = ?').get(dept_id);
 
-    req.io.to(`dept_${dept_id}`).emit('queue_updated');
+    req.io.to(`dept_${dept_id}`).to('public_monitor').emit('queue_updated');
     req.io.to('public_monitor').emit('ticket_called', {
       dept_id,
       department_name: dept.name,
@@ -108,7 +108,7 @@ exports.complete = (req, res) => {
       WHERE ticket_id = ?
     `).run(duration, notes, ticket_id);
 
-    req.io.to(`dept_${ticket.department_id}`).emit('queue_updated');
+    req.io.to(`dept_${ticket.department_id}`).to('public_monitor').emit('queue_updated');
     log(req.user?.user_id, 'TICKET_COMPLETED', 'ticket', ticket_id, { ticket_number: ticket.ticket_number, duration_min: duration });
 
     res.json({ success: true });
@@ -158,7 +158,7 @@ exports.skip = (req, res) => {
     `).run(`Skipped: ${reason}`, ticket_id);
 
     const ticket = db.prepare('SELECT * FROM tickets WHERE ticket_id = ?').get(ticket_id);
-    req.io.to(`dept_${ticket.department_id}`).emit('queue_updated');
+    req.io.to(`dept_${ticket.department_id}`).to('public_monitor').emit('queue_updated');
     log(req.user?.user_id, 'TICKET_SKIPPED', 'ticket', ticket_id, { ticket_number: ticket.ticket_number, reason });
 
     res.json({ success: true });
@@ -190,7 +190,7 @@ exports.noShow = (req, res) => {
       WHERE ticket_id = ?
     `).run(reason ? `No-Show: ${reason.trim()}` : null, ticket_id);
 
-    req.io.to(`dept_${ticket.department_id}`).emit('queue_updated');
+    req.io.to(`dept_${ticket.department_id}`).to('public_monitor').emit('queue_updated');
     log(req.user?.user_id, 'TICKET_NO_SHOW', 'ticket', ticket_id, { ticket_number: ticket.ticket_number, reason });
 
     res.json({ success: true });
@@ -219,7 +219,7 @@ exports.cancel = (req, res) => {
       WHERE ticket_id = ?
     `).run(`Cancelled: ${reason.trim()}`, ticket_id);
 
-    req.io.to(`dept_${ticket.department_id}`).emit('queue_updated');
+    req.io.to(`dept_${ticket.department_id}`).to('public_monitor').emit('queue_updated');
     log(req.user?.user_id, 'TICKET_CANCELLED', 'ticket', ticket_id, { ticket_number: ticket.ticket_number, reason });
 
     res.json({ success: true });
@@ -267,7 +267,7 @@ exports.transfer = (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?)
     `).run(ticket_id, ticket_id, original.department_id, to_dept_id, staff_id, reason);
 
-    req.io.to(`dept_${original.department_id}`).emit('queue_updated');
+    req.io.to(`dept_${original.department_id}`).to('public_monitor').emit('queue_updated');
     req.io.to(`dept_${to_dept_id}`).emit('queue_updated');
     log(staff_id, 'TICKET_TRANSFERRED', 'ticket', ticket_id, {
       ticket_number: original.ticket_number, from_dept: fromDept?.name, to_dept: toDept.name, reason

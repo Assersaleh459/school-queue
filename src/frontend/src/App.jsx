@@ -17,6 +17,7 @@ const Settings     = lazy(() => import('./pages/admin/Settings'));
 const Announcements = lazy(() => import('./pages/admin/Announcements'));
 const AuditLog     = lazy(() => import('./pages/admin/AuditLog'));
 const QueueControl = lazy(() => import('./pages/admin/QueueControl'));
+const VoiceRecordings = lazy(() => import('./pages/admin/VoiceRecordings'));
 const Reports      = lazy(() => import('./pages/Reports'));
 const AllQueues    = lazy(() => import('./pages/AllQueues'));
 const PublicDisplay = lazy(() => import('./pages/PublicDisplay'));
@@ -125,6 +126,7 @@ export default function App() {
             <Route path="settings" element={<Settings />} />
             <Route path="audit-log" element={<AuditLog />} />
             <Route path="queue-control" element={<QueueControl />} />
+            <Route path="voice" element={<VoiceRecordings />} />
           </Route>
 
           <Route path="/reports" element={

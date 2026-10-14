@@ -255,7 +255,7 @@ const metaRows = [
   ['Product',      'SchoolQ — Queue Management System'],
   ['Client',       'Al-Noor International School'],
   ['Generated',    new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })],
-  ['Versions',     'v1.2.0 → v1.6.0  (33 releases)'],
+  ['Versions',     'v1.2.0 → v1.10.0  (37 releases)'],
 ];
 metaRows.forEach(([k, v], i) => {
   doc.fontSize(8.5).fillColor(C.teal).font('Helvetica-Bold').text(k, 74, 295 + i * 13, { lineBreak: false, width: 90 });
@@ -295,6 +295,10 @@ const idx = [
   { v:'1.5.49', date:'12 Oct 2026', label:'New License Signing Key',             type:'security' },
   { v:'1.5.50', date:'13 Oct 2026', label:'Staff Setup Test Connection Fix',     type:'fix'      },
   { v:'1.6.0',  date:'13 Oct 2026', label:'LAN Server Discovery & Port Conflicts', type:'minor'  },
+  { v:'1.7.0',  date:'13 Oct 2026', label:'Offline Recorded Voice Announcements',  type:'minor'  },
+  { v:'1.8.0',  date:'14 Oct 2026', label:'Voice Engine & Spoken Announcements',   type:'minor'  },
+  { v:'1.9.0',  date:'14 Oct 2026', label:'Choose the Announcement Voice',         type:'minor'  },
+  { v:'1.10.0', date:'15 Oct 2026', label:'Two Voices, Smart Media Pause, Call Banner', type:'minor' },
 ];
 const typeBadgeColors = {
   initial:'#3B82F6', patch:'#16A34A', security:'#DC2626',
@@ -1448,6 +1452,123 @@ fileTable([
 ]);
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  v1.7.0 — OFFLINE RECORDED VOICE ANNOUNCEMENTS
+// ─────────────────────────────────────────────────────────────────────────────
+versionHeader({
+  version: '1.7.0', date: '13 Oct 2026', type: 'minor',
+  commit: 'this release',
+  summary: 'Ticket Calls in Arabic & English With No Internet — Pre-Recorded Neural Voice',
+  stats: { files: 12, added: 530, removed: 23 },
+});
+bullet('Problem: Arabic calls needed internet (Google TTS); offline fallback had no Arabic voice — calls were silent or garbled');
+bullet('Calls are now assembled from recorded clips: «تنبيه من فضلك. التذكرة رقم» + «مية» + «وخمسة وعشرين» + «القسم» + …');
+sub('Voice: VoiceTut-TTS "Sarah" (Egyptian Arabic + English, Apache-2.0), generated once on the developer PC');
+sub('315 number clips ship with the app (1–999 in both languages, 3.7 MB); Arabic uses the «و» form after hundreds');
+sub('Per-school clips (template text + department names) live in %APPDATA%\\SchoolQ\\voice — survive updates');
+bullet('Schools keep their own call templates: each template is split into text pieces and {ticket}/{department}/{room}');
+bullet('Any piece without a recording falls back to the online voice for that piece only — a call is never silent');
+bullet('Settings → Voice: Recorded (offline) / Online, with a list of pieces that still have no recording');
+bullet('Clips preload while earlier ones play and are chained on "ended" — no overlap, tight joins');
+bullet('tools/voice/generate_voice_pack.py (dev-only): numbers + per-school packs, resumable, silence-trim + normalize');
+sub('Fixed during generation: digits glued to «و» were skipped by the normalizer — all 99 «و» clips regenerated');
+bullet('Verified: 5 voice-assembly unit tests; E2E — ticket 125, both languages, 14 clips in order, zero online TTS');
+fileTable([
+  { path: 'tools/voice/generate_voice_pack.py',            added: 174, removed: 0, note: 'NEW — VoiceTut clip generator' },
+  { path: 'src/frontend/src/lib/voiceClips.js',            added: 91, removed: 0,  note: 'NEW — template split, number clips, plan' },
+  { path: 'src/frontend/src/pages/PublicDisplay.jsx',      added: 44, removed: 17, note: 'Recorded playback + per-piece fallback' },
+  { path: 'src/frontend/src/pages/admin/Settings.jsx',     added: 64, removed: 1,  note: 'Voice mode + missing-recordings list' },
+  { path: 'src/backend/routes/voice.js',                   added: 24, removed: 0,  note: 'NEW — per-school clips + manifest' },
+  { path: 'src/frontend/src/lib/voiceClips.test.js',       added: 63, removed: 0,  note: 'NEW — 5 tests (node --test)' },
+  { path: 'src/frontend/public/voice/ (315 clips)',        added: 0,  removed: 0,  note: 'Numbers 1–999, AR + EN, 3.7 MB' },
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  v1.8.0 — VOICE ENGINE ON THE SERVER + SPOKEN ANNOUNCEMENTS
+// ─────────────────────────────────────────────────────────────────────────────
+versionHeader({
+  version: '1.8.0', date: '14 Oct 2026', type: 'minor',
+  commit: 'this release',
+  summary: 'Record Any Phrase on the School Server in Advance; Announce on the Display Offline',
+  stats: { files: 20, added: 842, removed: 40 },
+});
+bullet('Optional Voice Engine add-on (~5 GB): VoiceTut model + private Python on the server PC, one-click install');
+sub('install-engine.ps1: resumable downloads with SHA-256 checks, NVIDIA GPU → CUDA build, otherwise CPU');
+sub('Measured: ~1 min per phrase on a GPU (Quadro M2000); 3–7 min per phrase on an old 8-core CPU');
+bullet('Admin → Voice Recordings: every piece (calls, departments, announcements, own phrases) with status');
+sub('Generate all missing · Record any phrase in advance · ▶ play · 🔁 re-record · 🗑 delete');
+bullet('Engine runs only when asked, never during a call: model loads once, stays 10 min, then frees memory');
+bullet('New recordings reach displays instantly (voice_updated socket event) — no restart, no 30 s wait');
+bullet('Announcements: 📢 "Announce on display" plays the message on the TV, recorded voice when available');
+bullet('Shared voicegen.py: the dev tool and the server engine produce identical clips');
+bullet('Verified: 8 engine tests (fake worker), 2 new voice tests; E2E with the real engine — record → 📢 → plays offline (10/10)');
+fileTable([
+  { path: 'src/backend/voice-engine/engine.js',            added: 183, removed: 0, note: 'NEW — queue, worker lifecycle, manifest' },
+  { path: 'src/backend/voice-engine/worker.py',            added: 58, removed: 0,  note: 'NEW — model stays loaded, JSON-lines jobs' },
+  { path: 'src/backend/voice-engine/voicegen.py',          added: 58, removed: 0,  note: 'NEW — shared trim/normalize/synthesis' },
+  { path: 'src/backend/voice-engine/install-engine.ps1',   added: 115, removed: 0, note: 'NEW — add-on installer' },
+  { path: 'src/frontend/src/pages/admin/VoiceRecordings.jsx', added: 237, removed: 0, note: 'NEW — admin page' },
+  { path: 'src/backend/routes/voice.js',                   added: 56, removed: 0,  note: 'engine, generate, remove, install, announce' },
+  { path: 'src/backend/tests/voiceEngine.test.js',         added: 96, removed: 0,  note: 'NEW — 8 tests' },
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  v1.9.0 — CHOOSE THE ANNOUNCEMENT VOICE
+// ─────────────────────────────────────────────────────────────────────────────
+versionHeader({
+  version: '1.9.0', date: '14 Oct 2026', type: 'minor',
+  commit: 'this release',
+  summary: 'Pick Any of the 17 VoiceTut Voices — Prepared in Advance, Never Mixed',
+  stats: { files: 12, added: 330, removed: 90 },
+});
+bullet('Voice Recordings → Voice: all 17 voices (male + female) with a ▶ sample of each');
+bullet('"Prepare" records a voice\'s 315 number clips + all phrases in the background (resumable)');
+sub('~5 h per voice with a GPU — Sarah ships ready, so she never needs preparing');
+bullet('"Use" switches every announcement to that voice — only once fully prepared, so calls never mix voices');
+bullet('Each voice keeps its own recordings (voice/<Name>/) — switching back and forth is instant');
+bullet('Al-Noor 1.7.0 recordings move automatically into voice/Sarah/ on first start');
+bullet('Number-word logic now lives once in voicegen.py (dev tool + engine share it)');
+bullet('Verified: 13 engine tests, 8 voice tests; E2E with the real engine — prepare Yasmin, switch, display plays her clips (14/14)');
+fileTable([
+  { path: 'src/backend/voice-engine/engine.js',            added: 90, removed: 40, note: 'Per-voice folders, number jobs, migration' },
+  { path: 'src/backend/routes/voice.js',                   added: 70, removed: 15, note: 'voices, sample, prepare, use' },
+  { path: 'src/backend/voice-engine/voicegen.py',          added: 45, removed: 0,  note: 'number_slots / number_text' },
+  { path: 'src/frontend/src/pages/admin/VoiceRecordings.jsx', added: 95, removed: 10, note: 'Voice picker' },
+  { path: 'src/backend/tests/voiceEngine.test.js',         added: 60, removed: 15, note: '13 tests (+5)' },
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  v1.10.0 — TWO VOICES, SMART MEDIA PAUSE, CALL BANNER, INSTANT DISPLAY
+// ─────────────────────────────────────────────────────────────────────────────
+versionHeader({
+  version: '1.10.0', date: '15 Oct 2026', type: 'minor',
+  commit: 'this release',
+  summary: 'Separate Call & Announcement Voices, Pause Only Playing Media, Banner Over Video, Instant Updates',
+  stats: { files: 20, added: 520, removed: 110 },
+});
+bullet('Two voices: "Use for calls" (needs the 315 number clips) and "Use for announcements" (any voice, right away)');
+sub('Choosing an announcement voice records your announcement sentences in it automatically');
+bullet('Voice engine: ⏸ Pause / ▶ Resume — the clip in progress finishes, the GPU is freed while paused');
+bullet('Priority queue: a single recording jumps ahead of a voice preparation (minutes instead of hours)');
+bullet('Smart media pause: asks Windows what is actually playing, pauses only that, resumes only what SchoolQ paused');
+sub('Before: a blind Play/Pause key press — with nothing playing it could START music');
+bullet('Call banner: ticket, department (EN + AR) and room appear over any video / app during the call, then fade');
+sub('Never takes focus (video stays fullscreen), click-through; setting: only when media plays / always / never');
+bullet('Display refreshes instantly on every queue change, settings change and announcement change (timers kept as backup)');
+sub('Fixed: new announcements only reached the ticker after the display was reloaded');
+bullet('▶ preview on the Announcements page plays the real recording when there is one');
+bullet('Fixed: the hidden banner window would have kept the app running after closing SchoolQ');
+bullet('Verified: 16 engine tests, banner window check (8), display E2E with media/banner/two voices/instant updates (13/13), API regression 53/53');
+fileTable([
+  { path: 'electron/mediaControl.js',                      added: 105, removed: 0, note: 'NEW — Windows media sessions helper' },
+  { path: 'electron/banner.js + banner.html',              added: 170, removed: 0, note: 'NEW — call banner window' },
+  { path: 'electron/main.js',                              added: 20, removed: 22, note: 'media/banner IPC, old media key removed' },
+  { path: 'src/backend/voice-engine/engine.js',            added: 35, removed: 6,  note: 'pause/resume, priority' },
+  { path: 'src/backend/routes/voice.js',                   added: 40, removed: 12, note: 'announcement voice, pause/resume' },
+  { path: 'src/frontend/src/pages/PublicDisplay.jsx',      added: 60, removed: 35, note: 'media + banner flow, live events' },
+  { path: 'src/frontend/src/pages/admin/VoiceRecordings.jsx', added: 70, removed: 25, note: 'two voices, pause button' },
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  SUMMARY PAGE
 // ─────────────────────────────────────────────────────────────────────────────
 newPage();
@@ -1491,6 +1612,10 @@ const timeline = [
   { v:'v1.5.49', date:'12 Oct 2026', type:'security', desc:'New license signing keypair (old private key unavailable)' },
   { v:'v1.5.50', date:'13 Oct 2026', type:'fix',      desc:'Staff first-time setup: Test Connection works (CORS-free IPC check)' },
   { v:'v1.6.0',  date:'13 Oct 2026', type:'minor',    desc:'LAN server discovery, self-healing Staff startup, port-conflict handling' },
+  { v:'v1.7.0',  date:'13 Oct 2026', type:'minor',    desc:'Offline recorded voice: Arabic + English calls from clips, no internet' },
+  { v:'v1.8.0',  date:'14 Oct 2026', type:'minor',    desc:'Voice Engine on the server, Voice Recordings page, spoken announcements' },
+  { v:'v1.9.0',  date:'14 Oct 2026', type:'minor',    desc:'Choose any of 17 voices — prepare in advance, switch instantly' },
+  { v:'v1.10.0', date:'15 Oct 2026', type:'minor',    desc:'Two voices, pause engine, smart media pause, call banner, instant display' },
 ];
 const tc = { initial:C.navy, patch:C.green, security:C.red, fix:C.amber, minor:C.blue, ux:C.purple };
 timeline.forEach((r, i) => {
@@ -1507,7 +1632,7 @@ timeline.forEach((r, i) => {
 
 sectionTitle('Cumulative Change Statistics');
 const stats = [
-  ['Total versions released',      '33 (v1.2.0 → v1.6.0)'],
+  ['Total versions released',      '37 (v1.2.0 → v1.10.0)'],
   ['Total git commits',            '25+ commits on main branch'],
   ['Total files ever modified',    '~80 unique files touched'],
   ['Lines added across all commits','~22,000+'],
@@ -1516,7 +1641,7 @@ const stats = [
   ['Frontend files modified',      '~30 (pages, components, stores, hooks)'],
   ['New files created',            '13 (audit.js, settingsCache.js, validate.js, errorHandler.js,\n                         runner.js, Toast.jsx, useToastStore.js, 2 new pages, 3 test files, scripts/)'],
   ['Files deleted',                '2 (AdminPanel.jsx, DisplayMonitor.jsx — legacy)'],
-  ['Test coverage',                '30 tests — auth, ticket validation, middleware rules, queue logic, LAN discovery'],
+  ['Test coverage',                '54 tests — auth, validation, queue logic, LAN discovery, offline voice, voice engine, voices'],
   ['Supported platforms',          'Windows 10/11 x64 (Electron 41)'],
   ['Node.js runtime (backend)',    'Electron bundled Node (v24-based, ABI 145)'],
 ];
@@ -1532,7 +1657,7 @@ const mat = [
   { area:'Database Design',            grade:'B',  color:C.teal,   note:'WAL, foreign keys, 10 indexes, migration runner, transactions' },
   { area:'Real-time Features',         grade:'A-', color:C.green,  note:'Socket.io with auth, force-logout events, dept rooms, user tracking' },
   { area:'Logging & Audit',            grade:'C+', color:C.amber,  note:'Audit log table + morgan; no structured logging, no rotation' },
-  { area:'Testing',                    grade:'C+', color:C.amber,  note:'30 unit tests; E2E run manually, not automated; no CI pipeline' },
+  { area:'Testing',                    grade:'C+', color:C.amber,  note:'54 unit tests; E2E run manually, not automated; no CI pipeline' },
   { area:'Code Organization',          grade:'B+', color:C.green,  note:'Clean route/controller split, Zustand, API layer, no fat controllers' },
   { area:'User Experience',            grade:'B',  color:C.teal,   note:'Toast system, skeleton loaders, real-time updates, bilingual voice' },
   { area:'Build & Deployment',         grade:'B-', color:C.amber,  note:'2 installer targets, per-install secret; no auto-update, no code signing' },

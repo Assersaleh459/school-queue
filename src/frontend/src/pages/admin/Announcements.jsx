@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { adminAPI } from '../../lib/api';
+import { adminAPI, voiceAPI } from '../../lib/api';
+import { toast } from '../../store/useToastStore';
+import { announcementTexts, clipKey, phraseUrl } from '../../lib/voiceClips';
 
 const EMPTY = { message_text: '', message_text_ar: '', speak_language: 'en', display_order: '', is_active: true };
 
@@ -23,6 +25,26 @@ function playTTS(text, lang) {
     }, { once: true });
     audio.play().catch(() => audio.dispatchEvent(new Event('error')));
   });
+}
+
+// Plays a recorded clip to the end ('ended', not play() — that resolves on start)
+function playUrl(src) {
+  return new Promise((resolve) => {
+    const audio = new Audio(src);
+    audio.addEventListener('ended', resolve, { once: true });
+    audio.addEventListener('error', resolve, { once: true });
+    audio.play().catch(resolve);
+  });
+}
+
+// ▶ preview: the announcement voice's recording when there is one, else the online voice
+async function preview(a) {
+  let voice = {};
+  try { const m = (await voiceAPI.manifest()).data || {}; voice = m.announce || m; } catch {}
+  for (const t of announcementTexts(a)) {
+    const file = voice[t.lang]?.[clipKey(t.text)];
+    await (file ? playUrl(phraseUrl(voice, file)) : playTTS(t.text, t.lang));
+  }
 }
 
 export default function Announcements() {
@@ -93,14 +115,7 @@ export default function Announcements() {
   const handleTest = async () => {
     if (!form.message_text) return;
     setTesting(true);
-    if (form.speak_language === 'both') {
-      await playTTS(form.message_text, 'en');
-      if (form.message_text_ar) await playTTS(form.message_text_ar, 'ar');
-    } else if (form.speak_language === 'ar') {
-      await playTTS(form.message_text_ar || form.message_text, 'ar');
-    } else {
-      await playTTS(form.message_text, 'en');
-    }
+    await preview(form);
     setTesting(false);
   };
 
@@ -142,15 +157,20 @@ export default function Announcements() {
             <div className="flex gap-2 shrink-0">
               <button
                 onClick={async () => {
-                  if (a.speak_language === 'both') {
-                    await playTTS(a.message_text, 'en');
-                    if (a.message_text_ar) await playTTS(a.message_text_ar, 'ar');
-                  } else {
-                    const text = (a.speak_language === 'ar' && a.message_text_ar) ? a.message_text_ar : a.message_text;
-                    const lang = a.speak_language === 'ar' ? 'ar' : 'en';
-                    await playTTS(text, lang);
+                  try {
+                    await voiceAPI.announce(a.announcement_id);
+                    toast.success('Announced on the display');
+                  } catch (err) {
+                    toast.error(err.response?.data?.error || 'Could not announce');
                   }
                 }}
+                className="px-3 py-1 bg-navy text-white rounded text-sm hover:bg-opacity-80"
+                title="Announce on display now (recorded voice if available — see Voice Recordings)"
+              >
+                📢
+              </button>
+              <button
+                onClick={() => preview(a)}
                 className="px-3 py-1 bg-teal text-white rounded text-sm hover:bg-opacity-80"
                 title="Preview voice"
               >
