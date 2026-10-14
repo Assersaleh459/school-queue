@@ -121,6 +121,10 @@ export const voiceAPI = {
   prepare:    (name, items)         => api.post(`/voice/voices/${name}/prepare`, { items }),
   use:        (name, forWhat = 'calls') => api.post(`/voice/voices/${name}/use`, { for: forWhat }),
   sample:     (name)                => api.get(`/voice/voices/${name}/sample`, { responseType: 'blob' }),
+  clips:      (name)                => api.get(`/voice/voices/${name}/clips`),
+  keepTakes:  (voice, items, keep)  => api.post('/voice/takes', { voice, items, keep }),
+  flag:       (voice, items, flagged) => api.post('/voice/flags', { voice, items, flagged }),
+  restore:    (voice, { lang, kind, n }) => api.post(`/voice/voices/${voice}/restore`, { lang, kind, n }),
 };
 
 export default api;

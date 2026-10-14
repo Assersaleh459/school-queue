@@ -178,3 +178,87 @@ test('pausing mid-run lets the current clip finish and frees the worker', async 
   engine.resume();
   await until(() => engine.numberCount('Omnia') === 315, 30000);
 });
+
+test('redoing a recorded phrase makes a new take; the old clip stays until the new one is kept', async () => {
+  make();
+  const file = path.join(dir, 'Sarah', clipFile('en', 'Hello'));
+  engine.enqueue([{ lang: 'en', text: 'Hello' }]);
+  await until(() => engine.status().done === 1);
+  fs.writeFileSync(file, 'old take');
+  expect(engine.enqueue([{ lang: 'en', text: 'Hello' }], { force: true })).toBe(1);
+  await until(() => engine.status().done === 2);
+  expect(fs.readFileSync(file, 'utf8')).toBe('old take');                         // still in use
+  expect(engine.listClips('Sarah').phrases).toEqual([expect.objectContaining({ lang: 'en', text: 'Hello', take: true })]);
+
+  expect(engine.keepTake('Sarah', { lang: 'en', text: 'Hello' }, 'new')).toBe(true);
+  expect(fs.readFileSync(file, 'utf8')).toBe('clip:Sarah:en:Hello');
+  expect(engine.listClips('Sarah').phrases[0].take).toBe(false);
+  expect(engine.keepTake('Sarah', { lang: 'en', text: 'Hello' }, 'new')).toBe(false); // nothing waiting
+});
+
+test('"keep old" throws the new take away', async () => {
+  make();
+  const file = path.join(dir, 'Sarah', clipFile('en', 'Hello'));
+  engine.enqueue([{ lang: 'en', text: 'Hello' }]);
+  await until(() => engine.status().done === 1);
+  fs.writeFileSync(file, 'old take');
+  engine.enqueue([{ lang: 'en', text: 'Hello' }], { force: true });
+  await until(() => engine.status().done === 2);
+  expect(engine.keepTake('Sarah', { lang: 'en', text: 'Hello' }, 'old')).toBe(true);
+  expect(fs.readFileSync(file, 'utf8')).toBe('old take');
+  expect(engine.listClips('Sarah').phrases[0].take).toBe(false);
+});
+
+test('a single number can be redone — Sarah\'s shipped number is replaced only when kept, and can be restored', async () => {
+  make();
+  const item = { lang: 'ar', kind: 'wn', n: 25 };
+  expect(engine.enqueue([item])).toBe(0);                                         // Sarah has it (shipped)
+  expect(engine.enqueue([{ lang: 'ar', kind: 'x', n: 5 }, { lang: 'en', kind: 'wn', n: 5 }], { force: true })).toBe(0);  // not real slots
+  expect(engine.enqueue([item], { force: true })).toBe(1);
+  expect(engine.status().queue[0]).toMatchObject({ voice: 'Sarah', lang: 'ar', number: { kind: 'wn', n: 25 }, take: true });
+  await until(() => engine.status().done === 1);
+  const own = path.join(dir, 'Sarah', 'ar', 'wn', '25.ogg');
+  expect(fs.existsSync(own)).toBe(false);                                          // shipped clip still used
+  let clip = engine.listClips('Sarah').numbers.find(c => c.lang === 'ar' && c.kind === 'wn' && c.n === 25);
+  expect(clip).toMatchObject({ recorded: true, edited: false, take: true });
+
+  engine.keepTake('Sarah', item, 'new');
+  expect(fs.readFileSync(own, 'utf8')).toBe('clip:Sarah:ar:wn25');
+  clip = engine.listClips('Sarah').numbers.find(c => c.lang === 'ar' && c.kind === 'wn' && c.n === 25);
+  expect(clip).toMatchObject({ edited: true, take: false });
+
+  expect(engine.restoreNumber('Sarah', item)).toBe(true);
+  expect(fs.existsSync(own)).toBe(false);
+  expect(engine.restoreNumber('Yasmin', item)).toBe(false);                        // only Sarah has shipped clips
+});
+
+test('a number redo goes ahead of a voice preparation', () => {
+  make({ command: { command: process.execPath, args: ['-e', 'setInterval(()=>{},1e6)'], env: {} } });   // never ready
+  fs.mkdirSync(path.join(dir, 'Yasmin', 'en', 'n'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'Yasmin', 'en', 'n', '7.ogg'), 'x');
+  engine.enqueueNumbers('Yasmin');
+  expect(engine.enqueue([{ lang: 'en', kind: 'n', n: 7 }], { force: true, voice: 'Yasmin' })).toBe(1);
+  expect(engine.enqueue([{ lang: 'ar', kind: 'n', n: 1 }], { force: true, voice: 'Yasmin' })).toBe(0);   // already queued by the preparation
+  expect(engine.status().queue[0]).toMatchObject({ voice: 'Yasmin', number: { kind: 'n', n: 7 }, take: true });
+});
+
+test('flags mark clips that sound bad; keeping a new take clears the flag', async () => {
+  make();
+  const num = { lang: 'en', kind: 'h', n: 300 };
+  const phrase = { lang: 'ar', text: ' القسم ' };
+  expect(engine.setFlag('Sarah', [num, phrase], true)).toBe(2);
+  expect(engine.setFlag('Sarah', [num], true)).toBe(0);                            // already flagged
+  engine.enqueue([{ lang: 'ar', text: 'القسم' }]);
+  await until(() => engine.status().done === 1);
+  let clips = engine.listClips('Sarah');
+  expect(clips.numbers.filter(c => c.flagged)).toEqual([expect.objectContaining(num)]);
+  expect(clips.phrases[0]).toMatchObject({ text: 'القسم', flagged: true });
+
+  engine.enqueue([phrase], { force: true });
+  await until(() => engine.status().done === 2);
+  engine.keepTake('Sarah', phrase, 'new');
+  clips = engine.listClips('Sarah');
+  expect(clips.phrases[0].flagged).toBe(false);
+  expect(engine.setFlag('Sarah', [num], false)).toBe(1);
+  expect(engine.listClips('Sarah').numbers.some(c => c.flagged)).toBe(false);
+});

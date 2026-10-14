@@ -255,7 +255,7 @@ const metaRows = [
   ['Product',      'SchoolQ — Queue Management System'],
   ['Client',       'Al-Noor International School'],
   ['Generated',    new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })],
-  ['Versions',     'v1.2.0 → v1.10.0  (37 releases)'],
+  ['Versions',     'v1.2.0 → v1.11.0  (38 releases)'],
 ];
 metaRows.forEach(([k, v], i) => {
   doc.fontSize(8.5).fillColor(C.teal).font('Helvetica-Bold').text(k, 74, 295 + i * 13, { lineBreak: false, width: 90 });
@@ -299,6 +299,7 @@ const idx = [
   { v:'1.8.0',  date:'14 Oct 2026', label:'Voice Engine & Spoken Announcements',   type:'minor'  },
   { v:'1.9.0',  date:'14 Oct 2026', label:'Choose the Announcement Voice',         type:'minor'  },
   { v:'1.10.0', date:'15 Oct 2026', label:'Two Voices, Smart Media Pause, Call Banner', type:'minor' },
+  { v:'1.11.0', date:'15 Oct 2026', label:'Listen & Fix Recordings',                type:'minor'  },
 ];
 const typeBadgeColors = {
   initial:'#3B82F6', patch:'#16A34A', security:'#DC2626',
@@ -1569,6 +1570,33 @@ fileTable([
 ]);
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  v1.11.0 — LISTEN & FIX RECORDINGS
+// ─────────────────────────────────────────────────────────────────────────────
+versionHeader({
+  version: '1.11.0', date: '15 Oct 2026', type: 'minor',
+  commit: 'this release',
+  summary: 'Hear Every Clip of Any Voice, Flag the Bad Ones, Redo and Compare Before It Goes Live',
+  stats: { files: 9, added: 690, removed: 25 },
+});
+bullet('New "Listen & fix" panel: every clip of any voice — all 315 numbers and every phrase — click to hear it');
+sub('Arrow keys move to the next clip, "Play all" plays a whole group through; Esc stops');
+bullet('"Sounds bad" flag (or press F while listening), then "Redo flagged" in one go');
+bullet('A redo is a new take saved next to the old one — the old recording stays in use');
+sub('Play old / Play new to compare, then Keep new or Keep old — a worse take never reaches the display');
+bullet('Single numbers can be redone (before: only a whole voice could be prepared)');
+sub("Sarah's built-in numbers too — the new take replaces it on the server; Original brings it back");
+bullet('Missing numbers of an unprepared voice can be recorded one at a time');
+bullet('Fixed: displays cached clips for an hour — a re-recorded phrase could still play the old take');
+bullet('Verified: 21 engine tests (+5), Listen & fix browser E2E 22/22, display E2E 13/13, API regression 53/53');
+fileTable([
+  { path: 'src/frontend/src/pages/admin/VoiceBrowser.jsx',  added: 346, removed: 0, note: 'NEW — Listen & fix panel' },
+  { path: 'src/backend/voice-engine/engine.js',             added: 137, removed: 13, note: 'takes, number redo, flags, restore' },
+  { path: 'src/backend/routes/voice.js',                    added: 57,  removed: 4,  note: 'clips list, takes, flags, number URLs' },
+  { path: 'src/frontend/src/pages/admin/VoiceRecordings.jsx', added: 47, removed: 4, note: 'compare & keep after re-record' },
+  { path: 'src/backend/tests/voiceEngine.test.js',          added: 84,  removed: 0,  note: '21 tests (+5)' },
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  SUMMARY PAGE
 // ─────────────────────────────────────────────────────────────────────────────
 newPage();
@@ -1616,6 +1644,7 @@ const timeline = [
   { v:'v1.8.0',  date:'14 Oct 2026', type:'minor',    desc:'Voice Engine on the server, Voice Recordings page, spoken announcements' },
   { v:'v1.9.0',  date:'14 Oct 2026', type:'minor',    desc:'Choose any of 17 voices — prepare in advance, switch instantly' },
   { v:'v1.10.0', date:'15 Oct 2026', type:'minor',    desc:'Two voices, pause engine, smart media pause, call banner, instant display' },
+  { v:'v1.11.0', date:'15 Oct 2026', type:'minor',    desc:'Listen & fix: hear every clip, flag, redo, compare old vs new take' },
 ];
 const tc = { initial:C.navy, patch:C.green, security:C.red, fix:C.amber, minor:C.blue, ux:C.purple };
 timeline.forEach((r, i) => {
@@ -1632,7 +1661,7 @@ timeline.forEach((r, i) => {
 
 sectionTitle('Cumulative Change Statistics');
 const stats = [
-  ['Total versions released',      '37 (v1.2.0 → v1.10.0)'],
+  ['Total versions released',      '38 (v1.2.0 → v1.11.0)'],
   ['Total git commits',            '25+ commits on main branch'],
   ['Total files ever modified',    '~80 unique files touched'],
   ['Lines added across all commits','~22,000+'],
@@ -1641,7 +1670,7 @@ const stats = [
   ['Frontend files modified',      '~30 (pages, components, stores, hooks)'],
   ['New files created',            '13 (audit.js, settingsCache.js, validate.js, errorHandler.js,\n                         runner.js, Toast.jsx, useToastStore.js, 2 new pages, 3 test files, scripts/)'],
   ['Files deleted',                '2 (AdminPanel.jsx, DisplayMonitor.jsx — legacy)'],
-  ['Test coverage',                '54 tests — auth, validation, queue logic, LAN discovery, offline voice, voice engine, voices'],
+  ['Test coverage',                '59 tests — auth, validation, queue logic, LAN discovery, offline voice, voice engine, voices, takes'],
   ['Supported platforms',          'Windows 10/11 x64 (Electron 41)'],
   ['Node.js runtime (backend)',    'Electron bundled Node (v24-based, ABI 145)'],
 ];
@@ -1657,7 +1686,7 @@ const mat = [
   { area:'Database Design',            grade:'B',  color:C.teal,   note:'WAL, foreign keys, 10 indexes, migration runner, transactions' },
   { area:'Real-time Features',         grade:'A-', color:C.green,  note:'Socket.io with auth, force-logout events, dept rooms, user tracking' },
   { area:'Logging & Audit',            grade:'C+', color:C.amber,  note:'Audit log table + morgan; no structured logging, no rotation' },
-  { area:'Testing',                    grade:'C+', color:C.amber,  note:'54 unit tests; E2E run manually, not automated; no CI pipeline' },
+  { area:'Testing',                    grade:'C+', color:C.amber,  note:'59 unit tests; E2E run manually, not automated; no CI pipeline' },
   { area:'Code Organization',          grade:'B+', color:C.green,  note:'Clean route/controller split, Zustand, API layer, no fat controllers' },
   { area:'User Experience',            grade:'B',  color:C.teal,   note:'Toast system, skeleton loaders, real-time updates, bilingual voice' },
   { area:'Build & Deployment',         grade:'B-', color:C.amber,  note:'2 installer targets, per-install secret; no auto-update, no code signing' },

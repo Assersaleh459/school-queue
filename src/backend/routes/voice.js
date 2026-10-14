@@ -50,14 +50,27 @@ router.get('/manifest', (req, res) => {
   const aVoice = announceVoice();
   res.json({
     voice,
-    numbers: voice === SHIPPED_VOICE ? '/voice' : `/api/voice/clips/${voice}`,
+    numbers: `/api/voice/numbers/${voice}`,
     clips: `/api/voice/clips/${voice}`,
     ...engine.readManifest(voice),
     announce: { voice: aVoice, clips: `/api/voice/clips/${aVoice}`, ...engine.readManifest(aVoice) },
   });
 });
 
-router.use('/clips', express.static(voiceDir, { maxAge: '1h', index: false }));
+// No max-age: a clip that was re-recorded keeps its file name, so displays must re-check it
+// (a quick 304 when unchanged) instead of playing a cached old take.
+router.use('/clips', express.static(voiceDir, { maxAge: 0, index: false }));
+
+// Number clips: a re-recorded one on the server, else (Sarah) the one shipped with the app
+router.get('/numbers/:voice/:lang/:kind/:n.ogg', (req, res) => {
+  const { voice, lang, kind, n } = req.params;
+  const slot = NUMBER_SLOTS.find(([l, k, x]) => l === lang && k === kind && String(x) === n);
+  if (!validVoice(voice) || !slot) return res.status(404).end();
+  const file = engine.numberPath(voice, slot);
+  if (fs.existsSync(file)) return res.sendFile(file, { maxAge: 0 });
+  if (voice === SHIPPED_VOICE) return res.redirect(302, `/voice/${lang}/${kind}/${n}.ogg`);
+  res.status(404).end();
+});
 
 // ── Voices ───────────────────────────────────────────────────────────────────
 
@@ -134,9 +147,14 @@ router.post('/engine/resume', admin, (req, res) => {
   res.json({ success: true });
 });
 
-// { items: [{ lang: 'ar'|'en', text }], force?: true, voice? }  — generated in the background
+// { items: [{ lang: 'ar'|'en', text } | { lang, kind, n }], force?: true, voice? }  — generated in
+// the background. force on a recorded clip makes a new take to compare (see /takes).
+const clipItems = (body) => (Array.isArray(body.items) ? body.items : [])
+  .filter(i => i && (typeof i.text === 'string' || (typeof i.kind === 'string' && i.n != null)))
+  .map(i => (i.kind ? { lang: i.lang, kind: i.kind, n: Number(i.n) } : { lang: i.lang, text: i.text }));
+
 router.post('/generate', admin, (req, res) => {
-  const items = Array.isArray(req.body.items) ? req.body.items.filter(i => i && typeof i.text === 'string') : [];
+  const items = clipItems(req.body);
   const voice = req.body.voice || activeVoice();
   if (!items.length) return res.status(422).json({ error: 'Nothing to generate' });
   if (!validVoice(voice)) return res.status(422).json({ error: 'Invalid voice' });
@@ -151,6 +169,41 @@ router.post('/remove', admin, (req, res) => {
   const voice = req.body.voice || activeVoice();
   if (!engine.remove(lang === 'ar' ? 'ar' : 'en', text, voice)) return res.status(404).json({ error: 'No recording for that text' });
   log(req.user?.user_id, 'VOICE_REMOVED', 'voice', null, { voice, lang, text });
+  res.json({ success: true });
+});
+
+// ── Listen & fix ─────────────────────────────────────────────────────────────
+
+// Every clip of a voice: { voice, numbers: [{ lang, kind, n, recorded, edited, take, flagged }],
+//                          phrases: [{ lang, text, file, take, flagged }] }
+router.get('/voices/:name/clips', admin, (req, res) => {
+  if (!validVoice(req.params.name)) return res.status(422).json({ error: 'Invalid voice' });
+  res.json(engine.listClips(req.params.name));
+});
+
+// { voice, items, keep: 'new' | 'old' } — after "redo": use the new take, or throw it away
+router.post('/takes', admin, (req, res) => {
+  const { voice, keep } = req.body;
+  if (!validVoice(voice) || !['new', 'old'].includes(keep)) return res.status(422).json({ error: 'Invalid request' });
+  const items = clipItems(req.body);
+  const done = items.filter(i => engine.keepTake(voice, i, keep)).length;
+  if (!done) return res.status(404).json({ error: 'No new take to keep' });
+  log(req.user?.user_id, keep === 'new' ? 'VOICE_TAKE_KEPT' : 'VOICE_TAKE_DISCARDED', 'voice', null, { voice, count: done });
+  res.json({ success: true, done });
+});
+
+// { voice, items, flagged } — mark clips that sound bad, to redo them together later
+router.post('/flags', admin, (req, res) => {
+  const { voice } = req.body;
+  if (!validVoice(voice)) return res.status(422).json({ error: 'Invalid voice' });
+  res.json({ success: true, changed: engine.setFlag(voice, clipItems(req.body), !!req.body.flagged) });
+});
+
+// { lang, kind, n } — Sarah: go back to the number clip shipped with the app
+router.post('/voices/:name/restore', admin, (req, res) => {
+  const { lang, kind, n } = req.body;
+  if (!engine.restoreNumber(req.params.name, { lang, kind, n: Number(n) })) return res.status(404).json({ error: 'Nothing to restore' });
+  log(req.user?.user_id, 'VOICE_NUMBER_RESTORED', 'voice', null, { voice: req.params.name, lang, kind, n });
   res.json({ success: true });
 });
 

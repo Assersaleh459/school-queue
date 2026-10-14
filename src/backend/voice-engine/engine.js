@@ -7,7 +7,10 @@
 //
 // Each voice has its own folder:  <voiceDir>/<Voice>/manifest.json + phrase clips
 //                                 <voiceDir>/<Voice>/<lang>/<n|wn|h>/<number>.ogg
-// (Sarah's numbers ship with the app under /voice/, so her folder only holds phrases.)
+// (Sarah's numbers ship with the app under /voice/, so her folder only holds phrases — plus
+//  any of her numbers an admin re-recorded, which then replace the shipped one.)
+//                                 <voiceDir>/<Voice>/takes/…     re-recordings waiting for "keep new / keep old"
+//                                 <voiceDir>/<Voice>/flags.json  clips an admin marked "sounds bad"
 const { spawn } = require('child_process');
 const crypto = require('crypto');
 const EventEmitter = require('events');
@@ -86,13 +89,38 @@ function createEngine({ voiceDir, engineDir = DEFAULT_ENGINE_DIR, command, idleM
   };
   const numberPath = (voice, [lang, kind, n]) => path.join(dirOf(voice), lang, kind, `${n}.ogg`);
 
+  // A clip is a phrase { lang, text } or a number { lang, kind, n }
+  const asNumber = (item) => {
+    const lang = item.lang === 'ar' ? 'ar' : 'en';
+    return NUMBER_SLOTS.find(([l, k, n]) => l === lang && k === item.kind && n === Number(item.n)) || null;
+  };
+  const clipId = (item) => {
+    const slot = item.kind ? asNumber(item) : null;
+    if (slot) return `n:${slot.join('/')}`;
+    const key = clipKey(item.text);
+    return key ? `p:${item.lang === 'ar' ? 'ar' : 'en'}:${key}` : null;
+  };
+  const takePath = (voice, item) => {
+    const slot = item.kind ? asNumber(item) : null;
+    return path.join(dirOf(voice), 'takes', slot ? `${slot.join('-')}.ogg` : clipFile(item.lang === 'ar' ? 'ar' : 'en', clipKey(item.text)));
+  };
+  const hasNumber = (voice, slot) => voice === SHIPPED_VOICE || fs.existsSync(numberPath(voice, slot));
+
+  const readFlags = (voice) => {
+    try { return new Set(JSON.parse(fs.readFileSync(path.join(dirOf(voice), 'flags.json'), 'utf8'))); } catch { return new Set(); }
+  };
+  const writeFlags = (voice, flags) => {
+    fs.mkdirSync(dirOf(voice), { recursive: true });
+    fs.writeFileSync(path.join(dirOf(voice), 'flags.json'), JSON.stringify([...flags]), 'utf8');
+  };
+
   // How many of the 315 number clips this voice has (Sarah's ship with the app)
   const numberCount = (voice) => voice === SHIPPED_VOICE
     ? NUMBER_SLOTS.length
     : NUMBER_SLOTS.filter(s => fs.existsSync(numberPath(voice, s))).length;
 
   const installed = () => fs.existsSync(cmd.command) && (command || fs.existsSync(path.join(engineDir, 'model', 'model.safetensors')));
-  const label = (j) => ({ voice: j.voice, lang: j.lang, text: j.text });
+  const label = (j) => ({ voice: j.voice, lang: j.lang, text: j.text, ...(j.number && { number: j.number }), ...(j.take && { take: true }) });
 
   function status() {
     return {
@@ -135,7 +163,7 @@ function createEngine({ voiceDir, engineDir = DEFAULT_ENGINE_DIR, command, idleM
     } else if (ev.type === 'fatal') {
       lastError = ev.error;
     } else if (ev.type === 'done' && current && ev.id === current.id) {
-      if (current.key) {                     // phrase → record it in the voice's manifest
+      if (current.key && !current.take) {    // phrase → record it in the voice's manifest
         const m = readManifest(current.voice);
         (m[current.lang] ||= {})[current.key] = current.file;
         writeManifest(current.voice, m);
@@ -205,21 +233,36 @@ function createEngine({ voiceDir, engineDir = DEFAULT_ENGINE_DIR, command, idleM
     emitter.emit('status');
   }
 
-  // items: [{ lang: 'ar'|'en', text }] — skips pieces already recorded or queued unless force.
-  // Phrases go ahead of any queued number clips, so a single recording never waits hours
-  // behind a voice preparation.
+  // items: [{ lang: 'ar'|'en', text } | { lang, kind: 'n'|'wn'|'h', n }] — skips clips already
+  // recorded or queued unless force. Forcing a recorded clip makes a new take next to it
+  // (takes/), so the old one stays in use until the admin keeps the new one.
+  // These go ahead of a voice preparation, so a single recording never waits hours.
   function enqueue(items, { force = false, voice = SHIPPED_VOICE } = {}) {
     if (!validVoice(voice)) throw new Error('Invalid voice name');
     const m = readManifest(voice);
-    let at = queue.findIndex(j => j.number);
+    let at = queue.findIndex(j => j.prep);
     if (at === -1) at = queue.length;
     let added = 0;
     for (const item of items) {
       const lang = item.lang === 'ar' ? 'ar' : 'en';
-      const key = clipKey(item.text);
-      if (!key || queued(voice, lang, j => j.key === key) || (!force && m[lang]?.[key])) continue;
-      const file = clipFile(lang, key);
-      queue.splice(at++, 0, { id: String(++seq), voice, lang, key, text: key, file, out: path.join(dirOf(voice), file) });
+      let job;
+      if (item.kind) {
+        const slot = asNumber(item);
+        if (!slot) continue;
+        const [, kind, n] = slot;
+        if (queued(voice, lang, j => j.number?.kind === kind && j.number?.n === n)) continue;
+        const exists = hasNumber(voice, slot);
+        if (!force && exists) continue;
+        job = { voice, lang, number: { kind, n }, text: `#${n}${kind === 'wn' ? ' (و)' : ''}`, take: exists, out: exists ? takePath(voice, item) : numberPath(voice, slot) };
+      } else {
+        const key = clipKey(item.text);
+        if (!key || queued(voice, lang, j => j.key === key)) continue;
+        const exists = !!m[lang]?.[key];
+        if (!force && exists) continue;
+        const file = clipFile(lang, key);
+        job = { voice, lang, key, text: key, file, take: exists, out: exists ? takePath(voice, item) : path.join(dirOf(voice), file) };
+      }
+      queue.splice(at++, 0, { id: String(++seq), ...job });
       added++;
     }
     return kick(added);
@@ -233,7 +276,7 @@ function createEngine({ voiceDir, engineDir = DEFAULT_ENGINE_DIR, command, idleM
     for (const slot of NUMBER_SLOTS) {
       const [lang, kind, n] = slot;
       if (fs.existsSync(numberPath(voice, slot)) || queued(voice, lang, j => j.number?.kind === kind && j.number?.n === n)) continue;
-      queue.push({ id: String(++seq), voice, lang, number: { kind, n }, text: `#${n}${kind === 'wn' ? ' (و)' : ''}`, out: numberPath(voice, slot) });
+      queue.push({ id: String(++seq), voice, lang, number: { kind, n }, prep: true, text: `#${n}${kind === 'wn' ? ' (و)' : ''}`, out: numberPath(voice, slot) });
       added++;
     }
     return kick(added);
@@ -248,11 +291,92 @@ function createEngine({ voiceDir, engineDir = DEFAULT_ENGINE_DIR, command, idleM
     delete m[lang][key];
     writeManifest(voice, m);
     try { fs.unlinkSync(path.join(dirOf(voice), path.basename(file))); } catch {}
+    try { fs.unlinkSync(takePath(voice, { lang, text: key })); } catch {}
     emitter.emit('change');
     return true;
   }
 
-  return Object.assign(emitter, { status, enqueue, enqueueNumbers, remove, pause, resume, stop, readManifest, numberCount, installed });
+  // Every clip a voice has, for listening through: numbers (315) and phrases, each with
+  // whether a new take is waiting and whether it's flagged.
+  function listClips(voice) {
+    if (!validVoice(voice)) throw new Error('Invalid voice name');
+    const flags = readFlags(voice);
+    const take = (item) => fs.existsSync(takePath(voice, item));
+    const numbers = NUMBER_SLOTS.map(([lang, kind, n]) => {
+      const item = { lang, kind, n };
+      return {
+        ...item,
+        recorded: hasNumber(voice, [lang, kind, n]),
+        edited: voice === SHIPPED_VOICE && fs.existsSync(numberPath(voice, [lang, kind, n])),   // replaces the shipped clip
+        take: take(item),
+        flagged: flags.has(clipId(item)),
+      };
+    });
+    const m = readManifest(voice);
+    const phrases = ['ar', 'en'].flatMap(lang => Object.entries(m[lang] || {}).map(([text, file]) => {
+      const item = { lang, text };
+      return { ...item, file, take: take(item), flagged: flags.has(clipId(item)) };
+    }));
+    return { voice, numbers, phrases };
+  }
+
+  // keep: 'new' → the new take replaces the clip in use (and the "sounds bad" flag is cleared);
+  // 'old' → the new take is thrown away.
+  function keepTake(voice, item, keep) {
+    if (!validVoice(voice)) return false;
+    const slot = item.kind ? asNumber(item) : null;
+    if (item.kind && !slot) return false;
+    const from = takePath(voice, item);
+    if (!fs.existsSync(from)) return false;
+    if (keep === 'new') {
+      let to;
+      if (slot) {
+        to = numberPath(voice, slot);
+      } else {
+        const lang = item.lang === 'ar' ? 'ar' : 'en';
+        const key = clipKey(item.text);
+        const m = readManifest(voice);
+        const file = m[lang]?.[key] || clipFile(lang, key);
+        if (!m[lang]?.[key]) { (m[lang] ||= {})[key] = file; writeManifest(voice, m); }
+        to = path.join(dirOf(voice), path.basename(file));
+      }
+      fs.mkdirSync(path.dirname(to), { recursive: true });
+      fs.renameSync(from, to);
+      setFlag(voice, [item], false);
+    } else {
+      fs.unlinkSync(from);
+    }
+    emitter.emit('change');
+    return true;
+  }
+
+  // Sarah only: drop a re-recorded number so the clip shipped with the app is used again
+  function restoreNumber(voice, item) {
+    const slot = asNumber(item);
+    if (voice !== SHIPPED_VOICE || !slot) return false;
+    try { fs.unlinkSync(numberPath(voice, slot)); } catch { return false; }
+    emitter.emit('change');
+    return true;
+  }
+
+  function setFlag(voice, items, flagged) {
+    if (!validVoice(voice)) return 0;
+    const flags = readFlags(voice);
+    let changed = 0;
+    for (const item of items) {
+      const id = clipId(item);
+      if (!id || flags.has(id) === !!flagged) continue;
+      if (flagged) flags.add(id); else flags.delete(id);
+      changed++;
+    }
+    if (changed) writeFlags(voice, flags);
+    return changed;
+  }
+
+  return Object.assign(emitter, {
+    status, enqueue, enqueueNumbers, remove, pause, resume, stop, readManifest, numberCount, installed,
+    listClips, keepTake, restoreNumber, setFlag, numberPath,
+  });
 }
 
 module.exports = { createEngine, clipKey, clipFile, validVoice, NUMBER_SLOTS, SHIPPED_VOICE, DEFAULT_ENGINE_DIR, HERE };

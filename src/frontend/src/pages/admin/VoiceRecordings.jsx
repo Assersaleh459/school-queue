@@ -3,6 +3,8 @@ import { adminAPI, voiceAPI } from '../../lib/api';
 import { DEFAULT_TEMPLATES, requiredPieces, phraseUrl } from '../../lib/voiceClips';
 import { toast } from '../../store/useToastStore';
 import useAuthStore from '../../store/useAuthStore';
+import VoiceBrowser, { TakeReview } from './VoiceBrowser';
+import { clipUrls, clipId } from '../../lib/voiceBrowse';
 
 const GROUPS = [
   { source: 'template',     title: 'Ticket calls',  hint: 'Fixed words from your call templates (Settings)' },
@@ -31,10 +33,25 @@ export default function VoiceRecordings() {
   const [phrase, setPhrase]       = useState('');
   const [phraseLang, setPhraseLang] = useState('ar');
   const [voices, setVoices]       = useState([]);
+  const [takes, setTakes]         = useState({});   // "<voice>|<clip id>" → clip, for new takes waiting
+  const [takesSeen, setTakesSeen] = useState(0);    // bumps on reload, so a take is fetched afresh
   const lastDone = useRef(-1);
   const player = useRef(null);
 
   const loadVoices = useCallback(() => voiceAPI.voices().then(r => setVoices(r.data)).catch(() => {}), []);
+
+  // New takes waiting in the voices in use, so a 🔁 below can be compared and kept
+  const loadTakes = useCallback(async (m) => {
+    const names = [...new Set([m.voice || 'Sarah', m.announce?.voice || m.voice || 'Sarah'])];
+    const found = {};
+    for (const name of names) {
+      try {
+        for (const c of (await voiceAPI.clips(name)).data.phrases) if (c.take) found[`${name}|${clipId(c)}`] = c;
+      } catch { /* older server */ }
+    }
+    setTakes(found);
+    setTakesSeen(n => n + 1);
+  }, []);
 
   const loadPieces = useCallback(async () => {
     const [settings, depts, anns, man] = await Promise.all([
@@ -47,7 +64,8 @@ export default function VoiceRecordings() {
     };
     setPieces(requiredPieces(templates, depts.data.filter(d => d.is_active), anns.data.filter(a => a.is_active)));
     setManifest(man.data || {});
-  }, []);
+    loadTakes(man.data || {});
+  }, [loadTakes]);
 
   const loadEngine = useCallback(async () => {
     try {
@@ -56,13 +74,13 @@ export default function VoiceRecordings() {
       // a clip finished → refresh the recorded list and voice progress
       if (r.data.done !== lastDone.current) {
         if (lastDone.current !== -1) {
-          voiceAPI.manifest().then(m => setManifest(m.data || {})).catch(() => {});
+          voiceAPI.manifest().then(m => { setManifest(m.data || {}); loadTakes(m.data || {}); }).catch(() => {});
           loadVoices();
         }
         lastDone.current = r.data.done;
       }
     } catch {}
-  }, [loadVoices]);
+  }, [loadVoices, loadTakes]);
 
   useEffect(() => {
     loadPieces().catch(() => toast.error('Failed to load recordings')).finally(() => setLoading(false));
@@ -96,7 +114,9 @@ export default function VoiceRecordings() {
         const batch = items.filter(p => voiceOf(p) === voice).map(({ lang, text }) => ({ lang, text }));
         queued += (await voiceAPI.generate(batch, force, voice)).data.queued;
       }
-      toast.success(queued ? `${queued} recording${queued > 1 ? 's' : ''} queued` : 'Already recorded');
+      toast.success(!queued ? 'Already recorded'
+        : force ? `New take queued — the current recording stays in use until you choose “Keep new”`
+        : `${queued} recording${queued > 1 ? 's' : ''} queued`);
       loadEngine();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Could not start generation');
@@ -117,6 +137,24 @@ export default function VoiceRecordings() {
     player.current?.pause();
     player.current = new Audio(phraseUrl(manifestOf(p), file));
     player.current.play().catch(() => toast.error('Could not play the recording'));
+  };
+
+  const takeOf = (p) => takes[`${voiceOf(p)}|${clipId(p)}`];
+  const playTake = (p, which) => {
+    player.current?.pause();
+    player.current = new Audio(clipUrls(voiceOf(p), takeOf(p), takesSeen)[which]);
+    player.current.play().catch(() => toast.error('Could not play the recording'));
+  };
+  const keepTake = async (p, keep) => {
+    try {
+      await voiceAPI.keepTakes(voiceOf(p), [{ lang: p.lang, text: p.text }], keep);
+      toast.success(keep === 'new' ? 'New take is now in use' : 'Kept the old recording');
+      const m = (await voiceAPI.manifest()).data || {};
+      setManifest(m);
+      loadTakes(m);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not keep the take');
+    }
   };
 
   const togglePause = async () => {
@@ -338,6 +376,7 @@ export default function VoiceRecordings() {
                     <span className="flex-1 text-sm text-gray-800" dir={p.lang === 'ar' ? 'rtl' : 'ltr'}>{p.text}</span>
                     {isCurrent(p) ? <span className="text-xs text-blue-700 font-semibold">Recording…</span>
                       : isQueued(p) ? <span className="text-xs text-gray-500">In queue</span>
+                      : file && takeOf(p) ? <TakeReview compact onPlay={(which) => playTake(p, which)} onKeep={(keep) => keepTake(p, keep)} />
                       : file ? (
                         <span className="flex gap-1">
                           <button onClick={() => playClip(p, file)} title="Play" className="px-2 py-1 text-sm rounded hover:bg-gray-100">▶</button>
@@ -357,6 +396,10 @@ export default function VoiceRecordings() {
           </section>
         );
       })}
+
+      {voices.length > 0 && (
+        <VoiceBrowser key={callsVoice} voices={voices} defaultVoice={callsVoice} installed={installed} engine={engine} onChanged={loadEngine} />
+      )}
     </div>
   );
 }
