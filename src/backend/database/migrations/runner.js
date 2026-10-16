@@ -30,6 +30,19 @@ const MIGRATIONS = [
           SET service_duration = CAST(ROUND((julianday(completed_at) - julianday(called_at)) * 1440) AS INTEGER)
           WHERE status = 'completed' AND called_at IS NOT NULL AND completed_at IS NOT NULL`,
   },
+  {
+    // Staff devices (PCs / browsers) that log in — the license limits how many at once
+    id: '007_add_devices',
+    sql: `CREATE TABLE IF NOT EXISTS devices (
+            device_id    TEXT PRIMARY KEY,
+            name         TEXT,
+            kind         TEXT NOT NULL DEFAULT 'browser',
+            last_user_id INTEGER,
+            first_seen   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_seen    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            revoked      INTEGER NOT NULL DEFAULT 0
+          )`,
+  },
 ];
 
 function runMigrations(db) {
@@ -70,4 +83,4 @@ function runMigrations(db) {
   }
 }
 
-module.exports = { runMigrations };
+module.exports = { runMigrations, MIGRATIONS };

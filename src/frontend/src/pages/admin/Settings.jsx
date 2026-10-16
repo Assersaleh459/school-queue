@@ -4,6 +4,32 @@ import { DEFAULT_TEMPLATES, missingClips } from '../../lib/voiceClips';
 import { toast } from '../../store/useToastStore';
 import TicketReceipt from '../../components/TicketReceipt';
 import useAuthStore from '../../store/useAuthStore';
+import { useVoiceLock, lockVoice } from '../../lib/voiceLock';
+import VoiceUnlock from '../../components/VoiceUnlock';
+import { useNavigate } from 'react-router-dom';
+
+// Small link at the bottom: the Voice Recordings tools are hidden while the license's Vyra
+// password locks them
+function VoiceToolsLock() {
+  const voice = useVoiceLock();
+  const navigate = useNavigate();
+  const [asking, setAsking] = useState(false);
+  if (!voice.ready || !voice.locked) return null;
+  return (
+    <div className="mt-8 pt-4 border-t border-gray-200 text-xs text-gray-400">
+      {voice.open ? (
+        <p>
+          Voice Recordings is unlocked for this window.{' '}
+          <button type="button" onClick={lockVoice} className="underline hover:text-gray-600">Lock again</button>
+        </p>
+      ) : asking ? (
+        <VoiceUnlock onUnlocked={() => navigate('/admin/voice')} />
+      ) : (
+        <button type="button" onClick={() => setAsking(true)} className="underline hover:text-gray-600">Voice tools (Vyra Systems)</button>
+      )}
+    </div>
+  );
+}
 
 export default function Settings() {
   const [settings, setSettings] = useState({});
@@ -375,7 +401,7 @@ export default function Settings() {
                   return (
                     <label
                       key={opt.value}
-                      className={`flex-1 border-2 rounded-xl py-3 px-4 cursor-pointer transition-all
+                      className={`relative flex-1 border-2 rounded-xl py-3 px-4 cursor-pointer transition-all
                         ${active ? 'border-teal bg-teal bg-opacity-10' : 'border-gray-200 hover:border-gray-300'}`}
                     >
                       <input
@@ -705,6 +731,8 @@ export default function Settings() {
           </div>
         </section>
       )}
+
+      <VoiceToolsLock />
 
       {showReprintReceipt && reprintTicket && (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 no-print">

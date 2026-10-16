@@ -88,6 +88,50 @@ ipcMain.on('license-status', (e) => {
   e.returnValue = { ...license.checkActivated(app.getPath('userData')), machineId: license.machineId() };
 });
 ipcMain.handle('activate-license', (e, key) => license.activate(app.getPath('userData'), key));
+// This PC as a Staff device (same Machine ID the server's license uses)
+ipcMain.on('device-info', (e) => { e.returnValue = { id: license.machineId(), name: os.hostname() }; });
+
+// Voice engine as a file (~8 GB) — on the server PC only, since the engine lives on its disk.
+// Same Voice Recordings lock as the web API (the page passes its unlock token).
+const serverHere = () => !!process.env.ACTUAL_PORT;
+const backend = (m) => require(path.join(__dirname, '../src/backend', m));
+ipcMain.on('engine-pack-available', (e) => { e.returnValue = serverHere(); });
+
+async function enginePackJob(e, unlockToken, job) {
+  if (!serverHere()) return { error: 'Do this on the server PC' };
+  if (!backend('voiceLock').tokenOk(unlockToken)) return { error: 'Voice Recordings is locked' };
+  const win = BrowserWindow.fromWebContents(e.sender);
+  const onProgress = (p) => { if (!e.sender.isDestroyed()) e.sender.send('engine-pack-progress', p); };
+  try {
+    return await job(win, onProgress);
+  } catch (err) {
+    return { error: err.message };
+  }
+}
+
+ipcMain.handle('engine-export', (e, unlockToken) => enginePackJob(e, unlockToken, async (win, onProgress) => {
+  const { DEFAULT_ENGINE_DIR } = backend('voice-engine/engine');
+  const { canceled, filePath } = await dialog.showSaveDialog(win, {
+    title: 'Export the voice engine',
+    defaultPath: 'SchoolQ Voice Engine.schoolq-engine',
+    filters: [{ name: 'SchoolQ voice engine', extensions: ['schoolq-engine'] }],
+  });
+  if (canceled || !filePath) return { canceled: true };
+  const r = await backend('voice-engine/pack').exportEngine(DEFAULT_ENGINE_DIR, filePath, { onProgress, appVersion: app.getVersion() });
+  return { ok: true, file: filePath, bytes: r.bytes };
+}));
+
+ipcMain.handle('engine-import', (e, unlockToken) => enginePackJob(e, unlockToken, async (win, onProgress) => {
+  const { DEFAULT_ENGINE_DIR } = backend('voice-engine/engine');
+  const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+    title: 'Import a voice engine',
+    filters: [{ name: 'SchoolQ voice engine', extensions: ['schoolq-engine'] }],
+    properties: ['openFile'],
+  });
+  if (canceled || !filePaths[0]) return { canceled: true };
+  const info = await backend('voice-engine/pack').importEngine(filePaths[0], DEFAULT_ENGINE_DIR, { onProgress });
+  return { ok: true, flavor: info.flavor };
+}));
 
 // Media: pause only what is playing, resume only what we paused
 ipcMain.handle('media-pause',  () => media.pause());

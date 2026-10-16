@@ -255,7 +255,7 @@ const metaRows = [
   ['Product',      'SchoolQ — Queue Management System'],
   ['Client',       'Al-Noor International School'],
   ['Generated',    new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })],
-  ['Versions',     'v1.2.0 → v1.11.0  (38 releases)'],
+  ['Versions',     'v1.2.0 → v1.13.0  (40 releases)'],
 ];
 metaRows.forEach(([k, v], i) => {
   doc.fontSize(8.5).fillColor(C.teal).font('Helvetica-Bold').text(k, 74, 295 + i * 13, { lineBreak: false, width: 90 });
@@ -300,6 +300,8 @@ const idx = [
   { v:'1.9.0',  date:'14 Oct 2026', label:'Choose the Announcement Voice',         type:'minor'  },
   { v:'1.10.0', date:'15 Oct 2026', label:'Two Voices, Smart Media Pause, Call Banner', type:'minor' },
   { v:'1.11.0', date:'15 Oct 2026', label:'Listen & Fix Recordings',                type:'minor'  },
+  { v:'1.12.0', date:'16 Oct 2026', label:'Licensing: Devices, Expiry, Generator',  type:'minor'  },
+  { v:'1.13.0', date:'17 Oct 2026', label:'Voice Password, Backup & Move Voices',    type:'minor'  },
 ];
 const typeBadgeColors = {
   initial:'#3B82F6', patch:'#16A34A', security:'#DC2626',
@@ -1597,6 +1599,72 @@ fileTable([
 ]);
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  v1.12.0 — LICENSING: STAFF DEVICE LIMIT, EXPIRY ALERTS, LICENSE GENERATOR
+// ─────────────────────────────────────────────────────────────────────────────
+versionHeader({
+  version: '1.12.0', date: '16 Oct 2026', type: 'minor',
+  commit: 'this release',
+  summary: 'Licenses Set Staff Devices and Expiry, Admin License Tab, Expiry Alerts, Seller Generator App',
+  stats: { files: 32, added: 1520, removed: 95 },
+});
+bullet('New license format: every field is signed - school, Staff devices, expiry date and Machine ID');
+sub('Fixed: before, the expiry date was not signed and could be removed from a key to make it permanent');
+sub('Keys are made for one server PC (its Machine ID); older keys keep working as perpetual, unlimited');
+bullet('Staff device limit: only so many Staff PCs or browsers may be signed in at the same time');
+sub('Server PC, TV display and kiosk are free; a device holds its slot while in use and 15 minutes after');
+sub('Over the limit, sign-in shows "Device limit reached (5 of 5)"; admins can free a slot (signs that device out)');
+bullet('Admin > License tab: license details, devices in use (meter + table), renew or upgrade with a new key');
+sub('A new key takes effect immediately, without a restart');
+bullet('Expiry alerts on Admin > Overview: amber from 30 days, red and pulsing from 7 days');
+bullet('After expiry: 7 days of grace with a red bar on every staff screen, then SchoolQ stops');
+sub('The "license expired" screen shows the Machine ID and accepts a new key without login');
+bullet('Activation screen shows the Machine ID prominently, with a Copy button');
+bullet('License Generator app for Vyra Systems: form, Machine ID check, key copy / save, history, CSV export, renew');
+sub('It never stores the private signing key - you select the .pem file, it is read only when making a key');
+bullet('Verified: 72 unit tests (+13), licensing API E2E 25/25, licensing UI E2E 14/14, generator E2E 12/12, API regression 53/53, display 13/13, Listen & fix 22/22');
+fileTable([
+  { path: 'electron/license.js',                         added: 117, removed: 30, note: 'v2 keys, expiry state, renew' },
+  { path: 'src/backend/devices.js',                      added: 84,  removed: 0,  note: 'NEW - Staff device slots' },
+  { path: 'src/backend/routes/license.js',               added: 73,  removed: 0,  note: 'NEW - License API + expiry stop' },
+  { path: 'src/frontend/src/pages/admin/License.jsx',    added: 192, removed: 0,  note: 'NEW - Admin License tab' },
+  { path: 'src/frontend/src/components/LicenseNotice.jsx', added: 64, removed: 0, note: 'NEW - expiry card + red bar' },
+  { path: 'tools/license-generator/',                    added: 442, removed: 0,  note: 'NEW - seller generator app' },
+  { path: 'src/backend/tests/ (license, devices)',       added: 162, removed: 0,  note: '13 tests' },
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  v1.13.0 — VOICE RECORDINGS PASSWORD, BACKUP & MOVE VOICES AND ENGINE
+// ─────────────────────────────────────────────────────────────────────────────
+versionHeader({
+  version: '1.13.0', date: '17 Oct 2026', type: 'minor',
+  commit: 'this release',
+  summary: 'Vyra Password Locks Voice Recordings, Voices and Engine as Files, Settings Scroll Fix',
+  stats: { files: 19, added: 980, removed: 30 },
+});
+bullet('Voice Recordings password, set by Vyra Systems per school in the License Generator');
+sub('Travels inside the signed license key as a hash - the school cannot remove or change it');
+sub('The tab is hidden; Settings > "Voice tools (Vyra Systems)" unlocks it for that window (12 hours)');
+sub('The server refuses voice changes without the unlock; 5 wrong tries = 5 minutes wait');
+sub('Displays, recorded calls and "Announce on display" keep working while locked');
+bullet('Backup & move (Voice Recordings): export chosen voices to a .schoolq-voices file, import at another school');
+sub('Import lists the voices in the file; tick which to bring in - the same voice is replaced, others are kept');
+bullet('Voice engine as one .schoolq-engine file (about 8 GB) - export / import on the server PC, no download');
+sub('Download caches are left out; the Python environment is pointed at the new location on import');
+sub('Clear message for FAT32 USB sticks (files over 4 GB) and full drives');
+bullet('Fixed: Settings > Voice - clicking Recorded / Online scrolled the whole window and left a white area');
+bullet('Generator / license dates use the local date (was UTC - "issued" could show yesterday after midnight)');
+bullet('Verified: 81 unit tests, voice lock + backup E2E 26/26, generator E2E 15/15, real engine export + import + Python start');
+fileTable([
+  { path: 'src/backend/voice-engine/pack.js',          added: 190, removed: 0,  note: 'NEW - voices / engine as files' },
+  { path: 'src/backend/voiceLock.js',                  added: 52,  removed: 0,  note: 'NEW - Vyra password lock' },
+  { path: 'src/backend/routes/voice.js',               added: 75,  removed: 2,  note: 'lock, unlock, export, import' },
+  { path: 'src/frontend/src/pages/admin/VoicePack.jsx', added: 165, removed: 0, note: 'NEW - Backup & move' },
+  { path: 'electron/main.js',                          added: 45,  removed: 0,  note: 'engine export / import (server PC)' },
+  { path: 'tools/license-generator/',                  added: 25,  removed: 4,  note: 'voice password field' },
+  { path: 'src/backend/tests/ (voicePack, voiceLock)', added: 165, removed: 0,  note: '9 tests' },
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  SUMMARY PAGE
 // ─────────────────────────────────────────────────────────────────────────────
 newPage();
@@ -1645,6 +1713,8 @@ const timeline = [
   { v:'v1.9.0',  date:'14 Oct 2026', type:'minor',    desc:'Choose any of 17 voices — prepare in advance, switch instantly' },
   { v:'v1.10.0', date:'15 Oct 2026', type:'minor',    desc:'Two voices, pause engine, smart media pause, call banner, instant display' },
   { v:'v1.11.0', date:'15 Oct 2026', type:'minor',    desc:'Listen & fix: hear every clip, flag, redo, compare old vs new take' },
+  { v:'v1.12.0', date:'16 Oct 2026', type:'minor',    desc:'Licensing: Staff device limit, expiry alerts, License tab, generator app' },
+  { v:'v1.13.0', date:'17 Oct 2026', type:'minor',    desc:'Vyra password for Voice Recordings, voices + engine as files, Settings fix' },
 ];
 const tc = { initial:C.navy, patch:C.green, security:C.red, fix:C.amber, minor:C.blue, ux:C.purple };
 timeline.forEach((r, i) => {
@@ -1661,7 +1731,7 @@ timeline.forEach((r, i) => {
 
 sectionTitle('Cumulative Change Statistics');
 const stats = [
-  ['Total versions released',      '38 (v1.2.0 → v1.11.0)'],
+  ['Total versions released',      '40 (v1.2.0 → v1.13.0)'],
   ['Total git commits',            '25+ commits on main branch'],
   ['Total files ever modified',    '~80 unique files touched'],
   ['Lines added across all commits','~22,000+'],
@@ -1670,7 +1740,7 @@ const stats = [
   ['Frontend files modified',      '~30 (pages, components, stores, hooks)'],
   ['New files created',            '13 (audit.js, settingsCache.js, validate.js, errorHandler.js,\n                         runner.js, Toast.jsx, useToastStore.js, 2 new pages, 3 test files, scripts/)'],
   ['Files deleted',                '2 (AdminPanel.jsx, DisplayMonitor.jsx — legacy)'],
-  ['Test coverage',                '59 tests — auth, validation, queue logic, LAN discovery, offline voice, voice engine, voices, takes'],
+  ['Test coverage',                '81 tests — auth, validation, queue logic, LAN discovery, offline voice, voice engine, voices, takes, licensing, devices, voice lock, backup'],
   ['Supported platforms',          'Windows 10/11 x64 (Electron 41)'],
   ['Node.js runtime (backend)',    'Electron bundled Node (v24-based, ABI 145)'],
 ];
@@ -1686,7 +1756,7 @@ const mat = [
   { area:'Database Design',            grade:'B',  color:C.teal,   note:'WAL, foreign keys, 10 indexes, migration runner, transactions' },
   { area:'Real-time Features',         grade:'A-', color:C.green,  note:'Socket.io with auth, force-logout events, dept rooms, user tracking' },
   { area:'Logging & Audit',            grade:'C+', color:C.amber,  note:'Audit log table + morgan; no structured logging, no rotation' },
-  { area:'Testing',                    grade:'C+', color:C.amber,  note:'59 unit tests; E2E run manually, not automated; no CI pipeline' },
+  { area:'Testing',                    grade:'C+', color:C.amber,  note:'81 unit tests; E2E run manually, not automated; no CI pipeline' },
   { area:'Code Organization',          grade:'B+', color:C.green,  note:'Clean route/controller split, Zustand, API layer, no fat controllers' },
   { area:'User Experience',            grade:'B',  color:C.teal,   note:'Toast system, skeleton loaders, real-time updates, bilingual voice' },
   { area:'Build & Deployment',         grade:'B-', color:C.amber,  note:'2 installer targets, per-install secret; no auto-update, no code signing' },

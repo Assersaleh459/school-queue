@@ -2,6 +2,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const db = require('../database/db');
 const { log } = require('../audit');
+const devices = require('../devices');
 
 exports.login = async (req, res) => {
   const { username, password } = req.body;
@@ -19,6 +20,15 @@ exports.login = async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    // License: only so many Staff devices may be connected at once
+    const device = devices.identify(req);
+    const allowed = devices.checkLogin(device);
+    if (!allowed.ok) {
+      log(user.user_id, 'LOGIN_DEVICE_LIMIT', 'device', null, { username: user.username, device: device.name });
+      return res.status(403).json({ error: allowed.error, code: 'device_limit' });
+    }
+    devices.register(device, user.user_id);
+
     db.prepare("UPDATE users SET last_login = datetime('now') WHERE user_id = ?").run(user.user_id);
     log(user.user_id, 'LOGIN', 'user', user.user_id, { username: user.username });
 
@@ -27,7 +37,8 @@ exports.login = async (req, res) => {
         user_id: user.user_id,
         username: user.username,
         role: user.role,
-        department_id: user.department_id
+        department_id: user.department_id,
+        device_id: device.id
       },
       process.env.JWT_SECRET,
       { expiresIn: '8h' }

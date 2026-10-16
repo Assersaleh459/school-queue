@@ -1,8 +1,10 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import useAuthStore from '../store/useAuthStore';
+import { useVoiceLock } from '../lib/voiceLock';
 
 export default function Admin() {
   const user = useAuthStore(state => state.user);
+  const voice = useVoiceLock();
   const logout = useAuthStore(state => state.logout);
   const navigate = useNavigate();
 
@@ -29,9 +31,15 @@ export default function Admin() {
           <NavLink to="/admin/queue-control" className={({ isActive }) =>
             `flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-teal text-white' : 'text-gray-300 hover:bg-white hover:bg-opacity-10'}`
           }>Queue Control</NavLink>
-          <NavLink to="/admin/voice" className={({ isActive }) =>
+          {/* Hidden while locked by the Vyra password (unlock from Settings) */}
+          {voice.ready && voice.open && (
+            <NavLink to="/admin/voice" className={({ isActive }) =>
+              `flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-teal text-white' : 'text-gray-300 hover:bg-white hover:bg-opacity-10'}`
+            }>Voice Recordings</NavLink>
+          )}
+          <NavLink to="/admin/license" className={({ isActive }) =>
             `flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-teal text-white' : 'text-gray-300 hover:bg-white hover:bg-opacity-10'}`
-          }>Voice Recordings</NavLink>
+          }>License</NavLink>
           {user?.role === 'super_admin' && (
             <NavLink to="/admin/settings" className={({ isActive }) =>
               `flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-teal text-white' : 'text-gray-300 hover:bg-white hover:bg-opacity-10'}`

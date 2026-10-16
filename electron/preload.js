@@ -15,5 +15,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openBackups:     ()         => ipcRenderer.invoke('open-backups'),
   restoreDatabase: ()         => ipcRenderer.invoke('restore-database'),
   licenseStatus:   ()         => ipcRenderer.sendSync('license-status'),
+  deviceInfo:      ()         => ipcRenderer.sendSync('device-info'),   // → { id, name } — counts toward the license's Staff devices
+  // Voice engine as a file — server PC only
+  enginePackAvailable: ()     => ipcRenderer.sendSync('engine-pack-available'),
+  engineExport:    (unlock)   => ipcRenderer.invoke('engine-export', unlock),
+  engineImport:    (unlock)   => ipcRenderer.invoke('engine-import', unlock),
+  onEnginePackProgress: (cb)  => {
+    const h = (e, p) => cb(p);
+    ipcRenderer.on('engine-pack-progress', h);
+    return () => ipcRenderer.removeListener('engine-pack-progress', h);
+  },
   activateLicense: (key)      => ipcRenderer.invoke('activate-license', key)
 });

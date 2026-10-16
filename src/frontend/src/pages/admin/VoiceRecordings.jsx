@@ -5,6 +5,9 @@ import { toast } from '../../store/useToastStore';
 import useAuthStore from '../../store/useAuthStore';
 import VoiceBrowser, { TakeReview } from './VoiceBrowser';
 import { clipUrls, clipId } from '../../lib/voiceBrowse';
+import { useVoiceLock } from '../../lib/voiceLock';
+import VoiceUnlock from '../../components/VoiceUnlock';
+import VoicePack from './VoicePack';
 
 const GROUPS = [
   { source: 'template',     title: 'Ticket calls',  hint: 'Fixed words from your call templates (Settings)' },
@@ -24,7 +27,23 @@ function LangBadge({ lang }) {
   return <span className="font-mono text-xs font-bold px-1.5 py-0.5 rounded bg-navy text-teal">{lang.toUpperCase()}</span>;
 }
 
-export default function VoiceRecordings() {
+// Locked by the license's Vyra password → ask for it first
+export default function VoiceRecordingsPage() {
+  const voice = useVoiceLock();
+  if (!voice.ready) return <div className="animate-pulse h-24 bg-gray-200 rounded-xl max-w-4xl" />;
+  if (!voice.open) {
+    return (
+      <div className="max-w-4xl">
+        <h2 className="text-2xl font-bold text-navy mb-1">Voice Recordings</h2>
+        <p className="text-sm text-gray-500 mb-6">This page is locked by Vyra Systems.</p>
+        <section className="bg-white rounded-xl shadow-sm p-6"><VoiceUnlock /></section>
+      </div>
+    );
+  }
+  return <VoiceRecordings />;
+}
+
+function VoiceRecordings() {
   const user = useAuthStore(s => s.user);
   const [engine, setEngine]       = useState(null);
   const [manifest, setManifest]   = useState({});
@@ -400,6 +419,8 @@ export default function VoiceRecordings() {
       {voices.length > 0 && (
         <VoiceBrowser key={callsVoice} voices={voices} defaultVoice={callsVoice} installed={installed} engine={engine} onChanged={loadEngine} />
       )}
+
+      <VoicePack voices={voices} installed={installed} onImported={() => { loadVoices(); loadPieces(); loadEngine(); }} />
     </div>
   );
 }

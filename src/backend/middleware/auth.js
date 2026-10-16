@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const db = require('../database/db');
+const devices = require('../devices');
 
 function authMiddleware(req, res, next) {
   const token = req.headers.authorization?.replace('Bearer ', '');
@@ -13,6 +14,12 @@ function authMiddleware(req, res, next) {
     const user = db.prepare('SELECT is_active FROM users WHERE user_id = ?').get(decoded.user_id);
     if (!user || !user.is_active) {
       return res.status(401).json({ error: 'Account deactivated' });
+    }
+    if (decoded.device_id) {
+      if (devices.isRevoked(decoded.device_id)) {
+        return res.status(401).json({ error: 'This device was signed out by the admin' });
+      }
+      devices.touch(decoded.device_id);
     }
     req.user = decoded;
     next();

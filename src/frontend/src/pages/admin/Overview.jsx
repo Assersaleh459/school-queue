@@ -1,14 +1,19 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { adminAPI } from '../../lib/api';
 import { departmentAPI } from '../../lib/api';
+import { licenseAPI } from '../../lib/licenseClient';
+import { LicenseCard } from '../../components/LicenseNotice';
 
 export default function Overview() {
   const [stats, setStats] = useState(null);
   const [departments, setDepartments] = useState([]);
+  const [lic, setLic] = useState(null);
 
   useEffect(() => {
     adminAPI.getDepartments().then(r => setDepartments(r.data)).catch(() => {});
     adminAPI.getUsers().then(r => setStats(r.data)).catch(() => {});
+    licenseAPI.get().then(r => setLic(r.data)).catch(() => {});
   }, []);
 
   const activeDepts = departments.filter(d => d.is_active).length;
@@ -16,6 +21,16 @@ export default function Overview() {
   return (
     <div>
       <h2 className="text-2xl font-bold text-navy mb-6">Overview</h2>
+
+      {lic && (
+        <div className="mb-6">
+          <LicenseCard lic={lic} action={
+            <Link to="/admin/license" className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 active:scale-95 transition">
+              License details
+            </Link>
+          } />
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-4 mb-8">
         <div className="bg-white rounded-xl shadow-sm p-6">

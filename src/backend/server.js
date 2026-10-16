@@ -65,6 +65,7 @@ const adminRoutes = require('./routes/admin');
 const reportRoutes = require('./routes/reports');
 const kioskRoutes = require('./routes/kiosk');
 const voiceRoutes = require('./routes/voice');
+const licenseRoutes = require('./routes/license');
 const { getSetting } = require('./settingsCache');
 
 const socketHandlers = require('./socket/handlers');
@@ -77,6 +78,10 @@ app.use((req, res, next) => {
   req.io = io;
   next();
 });
+
+// License first: past its grace period everything else answers 402 until it is renewed
+app.use('/api/license', licenseRoutes);
+app.use('/api', licenseRoutes.licenseGate);
 
 app.use('/api/tts', ttsRoute);
 app.use('/api/auth', authRoutes);

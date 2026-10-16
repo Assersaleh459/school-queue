@@ -34,7 +34,19 @@
     font-size: 15px; font-weight: 700; cursor: pointer; background: #5FAEB6; color: #fff;
   }
   .btn:hover { opacity: 0.88; }
-  .mid { font-size: 11px; color: #9ca3af; margin-top: 16px; text-align: center; word-break: break-all; }
+  .mid { margin-bottom: 20px; }
+  .mid-label { font-size: 12px; font-weight: 600; color: #6b7280; margin-bottom: 6px; }
+  .mid-row { display: flex; gap: 8px; }
+  .mid-row code {
+    flex: 1; font-family: ui-monospace, monospace; font-size: 13px; background: #f3f4f6;
+    border-radius: 8px; padding: 10px 12px; word-break: break-all; user-select: all;
+  }
+  .copy {
+    padding: 0 14px; border: 1.5px solid #e5e7eb; border-radius: 8px; background: #fff;
+    font-size: 13px; font-weight: 600; cursor: pointer; color: #19224A;
+  }
+  .copy:hover { background: #f9fafb; }
+  .notice { background: #fef2f2; color: #991b1b; border-radius: 8px; padding: 10px 12px; font-size: 13px; margin-bottom: 16px; display: none; }
 </style>
 </head>
 <body>
@@ -43,15 +55,23 @@
   <div class="subtitle">Software Activation</div>
 
   <h2>Activate this installation</h2>
-  <p class="lead">Enter the license key provided with your purchase. Activation is a one-time step and works fully offline.</p>
+  <div class="notice" id="notice"></div>
+  <p class="lead">Send the Machine ID below to Vyra Systems — your license key is made for this PC.
+    Then paste the key here. Activation works fully offline.</p>
+
+  <div class="mid">
+    <div class="mid-label">Machine ID of this PC</div>
+    <div class="mid-row">
+      <code id="machine">…</code>
+      <button class="copy" id="copy" type="button" onclick="copyId()">Copy</button>
+    </div>
+  </div>
 
   <label for="key">License Key</label>
   <textarea id="key" placeholder="Paste your license key here…"></textarea>
 
   <div id="status"></div>
   <button class="btn" onclick="activate()">Activate</button>
-
-  <div class="mid" id="machine"></div>
 </div>
 
 <script>
@@ -62,10 +82,26 @@
 
   window.addEventListener('DOMContentLoaded', () => {
     const st = window.electronAPI.licenseStatus();
-    if (st && st.machineId) {
-      document.getElementById('machine').textContent = 'Machine ID: ' + st.machineId;
+    if (st && st.machineId) document.getElementById('machine').textContent = st.machineId;
+    // An installed license that stopped working (expired, other PC…) — say why
+    if (st && st.reason && st.reason !== 'Not activated') {
+      const n = document.getElementById('notice');
+      n.textContent = st.reason + '. Contact Vyra Systems for a new license key.';
+      n.style.display = 'block';
     }
   });
+
+  function copyId() {
+    const code = document.getElementById('machine');
+    const range = document.createRange();
+    range.selectNodeContents(code);
+    const sel = window.getSelection();
+    sel.removeAllRanges(); sel.addRange(range);
+    document.execCommand('copy');
+    const b = document.getElementById('copy');
+    b.textContent = 'Copied';
+    setTimeout(() => { b.textContent = 'Copy'; }, 1500);
+  }
 
   async function activate() {
     const key = document.getElementById('key').value.trim();
@@ -73,7 +109,7 @@
     setStatus('Verifying…', 'info');
     const res = await window.electronAPI.activateLicense(key);
     if (res && res.valid) {
-      setStatus('✓ Activated for ' + (res.school || 'your school') + '. Launching…', 'ok');
+      setStatus('✓ Activated for ' + ((res.payload && res.payload.school) || 'your school') + '. Launching…', 'ok');
       setTimeout(() => window.electronAPI.relaunch(), 900);
     } else {
       setStatus('✗ ' + (res && res.reason ? res.reason : 'Activation failed'), 'err');

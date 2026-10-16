@@ -7,6 +7,10 @@ const { authMiddleware, requireRole, requirePageAccess } = require('../middlewar
 const { getSetting, invalidate: invalidateSettings } = require('../settingsCache');
 const { log } = require('../audit');
 const { createEngine, validVoice, NUMBER_SLOTS, SHIPPED_VOICE, DEFAULT_ENGINE_DIR, HERE } = require('../voice-engine/engine');
+const pack = require('../voice-engine/pack');
+const voiceLock = require('../voiceLock');
+const jwt = require('jsonwebtoken');
+const APP_VERSION = require('../../../package.json').version;
 
 const router = express.Router();
 
@@ -17,7 +21,8 @@ const voiceDir = path.join(path.dirname(db.name), 'voice');
 const engine = createEngine({ voiceDir });
 const referencesFile = path.join(DEFAULT_ENGINE_DIR, 'model', 'reference_speakers', 'references.json');
 
-const admin = [authMiddleware, requireRole('super_admin', 'admin')];
+// Voice tools: admins — and, when the license carries a Vyra password, only once unlocked
+const admin = [authMiddleware, requireRole('super_admin', 'admin'), voiceLock.voiceGuard];
 const canAnnounce = [authMiddleware, requirePageAccess('announcements', 'super_admin', 'admin')];
 
 // Voice for ticket calls (needs all 315 number clips) …
@@ -208,7 +213,7 @@ router.post('/voices/:name/restore', admin, (req, res) => {
 });
 
 // Opens the engine installer in a visible window on the server PC (downloads ~5 GB once).
-router.post('/engine/install', [authMiddleware, requireRole('super_admin')], (req, res) => {
+router.post('/engine/install', [authMiddleware, requireRole('super_admin'), voiceLock.voiceGuard], (req, res) => {
   if (process.platform !== 'win32') return res.status(400).json({ error: 'The voice engine installer is for Windows' });
   if (engine.installed()) return res.status(409).json({ error: 'Voice engine is already installed' });
   // detached on Windows = its own console window, so the admin can watch the download
@@ -216,6 +221,67 @@ router.post('/engine/install', [authMiddleware, requireRole('super_admin')], (re
     { detached: true, stdio: 'ignore', windowsHide: false }).unref();
   log(req.user?.user_id, 'VOICE_ENGINE_INSTALL', 'voice', null, {});
   res.json({ success: true });
+});
+
+// ── Lock (Vyra password from the license) ───────────────────────────────────
+
+router.get('/lock', authMiddleware, (req, res) => res.json({ locked: voiceLock.isLocked() }));
+
+router.post('/unlock', [authMiddleware, requireRole('super_admin', 'admin')], (req, res) => {
+  const r = voiceLock.unlock(req.user.user_id, req.body.password);
+  log(req.user.user_id, r.ok ? 'VOICE_UNLOCKED' : 'VOICE_UNLOCK_FAILED', 'voice', null, {});
+  if (!r.ok) return res.status(r.wait ? 429 : 403).json({ error: r.error });
+  res.json({ success: true, token: r.token });
+});
+
+// ── Backup & move: voices as a file ──────────────────────────────────────────
+
+// Downloads are plain links (the browser saves them), so they carry a 5-minute token
+const linkFor = (req, payload) => `/api/voice/export?t=${encodeURIComponent(jwt.sign({ ...payload, user_id: req.user.user_id }, process.env.JWT_SECRET, { expiresIn: '5m' }))}`;
+
+// { voices: [names] } → { url }
+router.post('/export-link', admin, (req, res) => {
+  const voices = (Array.isArray(req.body.voices) ? req.body.voices : []).filter(validVoice);
+  if (!voices.length) return res.status(422).json({ error: 'Choose at least one voice' });
+  res.json({ url: linkFor(req, { dl: 'voices', voices }) });
+});
+
+router.get('/export', async (req, res) => {
+  let t;
+  try { t = jwt.verify(String(req.query.t || ''), process.env.JWT_SECRET); } catch { return res.status(401).json({ error: 'Download link expired' }); }
+  if (t.dl !== 'voices') return res.status(400).json({ error: 'Bad link' });
+  res.setHeader('Content-Type', 'application/octet-stream');
+  res.setHeader('Content-Disposition', `attachment; filename="SchoolQ voices ${new Date().toISOString().slice(0, 10)}.schoolq-voices"`);
+  try {
+    await pack.exportVoices(voiceDir, t.voices, res, { appVersion: APP_VERSION });
+    log(t.user_id, 'VOICES_EXPORTED', 'voice', null, { voices: t.voices });
+    res.end();
+  } catch (err) {
+    if (!res.headersSent) res.status(422).json({ error: err.message });
+    else res.destroy(err);
+  }
+});
+
+// Step 1: upload the file (raw body) → which voices it holds
+router.post('/import', admin, async (req, res) => {
+  pack.cleanStaged(voiceDir);
+  try {
+    res.json(await pack.stageVoices(voiceDir, req));
+  } catch (err) {
+    res.status(422).json({ error: err.message });
+  }
+});
+
+// Step 2: { voices: [names] } — they replace the same voices here; other voices are kept
+router.post('/import/:id', admin, (req, res) => {
+  try {
+    const done = pack.applyVoices(voiceDir, req.params.id, Array.isArray(req.body.voices) ? req.body.voices : []);
+    engine.emit('change');
+    log(req.user.user_id, 'VOICES_IMPORTED', 'voice', null, { voices: done });
+    res.json({ success: true, imported: done });
+  } catch (err) {
+    res.status(422).json({ error: err.message });
+  }
 });
 
 // ── Spoken announcements ─────────────────────────────────────────────────────

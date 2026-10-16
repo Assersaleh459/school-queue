@@ -1,8 +1,11 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { settingsAPI, authAPI } from './lib/api';
+import './lib/licenseClient';   // device id on every request; "license expired" redirect
+import './lib/voiceLock';       // unlock token on voice requests
 import useAuthStore from './store/useAuthStore';
 import Toast from './components/Toast';
+import { LicenseBanner } from './components/LicenseNotice';
 
 // ── Lazy-loaded routes ────────────────────────────────────────────────────────
 const Login        = lazy(() => import('./pages/Login'));
@@ -18,6 +21,8 @@ const Announcements = lazy(() => import('./pages/admin/Announcements'));
 const AuditLog     = lazy(() => import('./pages/admin/AuditLog'));
 const QueueControl = lazy(() => import('./pages/admin/QueueControl'));
 const VoiceRecordings = lazy(() => import('./pages/admin/VoiceRecordings'));
+const License      = lazy(() => import('./pages/admin/License'));
+const LicenseExpired = lazy(() => import('./pages/LicenseExpired'));
 const Reports      = lazy(() => import('./pages/Reports'));
 const AllQueues    = lazy(() => import('./pages/AllQueues'));
 const PublicDisplay = lazy(() => import('./pages/PublicDisplay'));
@@ -92,9 +97,11 @@ export default function App() {
   return (
     <BrowserRouter>
       <Toast />
+      <LicenseBanner />
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/license-expired" element={<LicenseExpired />} />
 
           <Route path="/home" element={
             <ProtectedRoute>
@@ -127,6 +134,7 @@ export default function App() {
             <Route path="audit-log" element={<AuditLog />} />
             <Route path="queue-control" element={<QueueControl />} />
             <Route path="voice" element={<VoiceRecordings />} />
+            <Route path="license" element={<License />} />
           </Route>
 
           <Route path="/reports" element={

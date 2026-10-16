@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'" />
+<title>SchoolQ License Generator</title>
+<style>
+  :root {
+    --navy: #19224A; --teal: #5FAEB6; --gray: #6b7280; --line: #e5e7eb; --bg: #f0f4f8;
+    --red: #b91c1c; --red-bg: #fef2f2; --amber: #92400e; --amber-bg: #fffbeb; --green: #047857; --green-bg: #ecfdf5;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  [hidden] { display: none !important; }
+  body { font-family: 'Segoe UI', -apple-system, sans-serif; background: var(--bg); color: var(--navy); font-size: 14px; }
+  header { background: var(--navy); color: #fff; padding: 14px 24px; display: flex; align-items: center; gap: 16px; }
+  .logo { font-size: 20px; font-weight: 800; } .logo span { color: var(--teal); }
+  .sub { color: #aab3d1; font-size: 12px; }
+  .keypill { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 12px; }
+  .pill { padding: 5px 10px; border-radius: 999px; font-weight: 600; max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pill.ok { background: var(--green-bg); color: var(--green); } .pill.bad { background: var(--red-bg); color: var(--red); }
+  main { padding: 20px 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 1200px; margin: 0 auto; }
+  .card { background: #fff; border-radius: 14px; box-shadow: 0 2px 12px rgba(0,0,0,.06); padding: 22px; }
+  .wide { grid-column: 1 / -1; }
+  h2 { font-size: 16px; margin-bottom: 14px; }
+  label { display: block; font-size: 12px; font-weight: 600; color: var(--gray); margin: 12px 0 5px; }
+  input[type=text], input[type=number], input[type=date], input[type=search], textarea {
+    width: 100%; padding: 9px 11px; border: 1.5px solid var(--line); border-radius: 8px; font: inherit; color: inherit; outline: none;
+    transition: border-color .15s;
+  }
+  input:focus, textarea:focus { border-color: var(--teal); }
+  .mono { font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; }
+  .hint { font-size: 11.5px; color: #9ca3af; margin-top: 4px; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .seg { display: inline-flex; border: 1.5px solid var(--line); border-radius: 9px; padding: 2px; }
+  .seg button { border: 0; background: none; padding: 6px 14px; border-radius: 7px; font: inherit; font-weight: 600; color: var(--gray); cursor: pointer; transition: background .15s, color .15s; }
+  .seg button[aria-pressed=true] { background: var(--navy); color: #fff; }
+  .btn { border: 0; border-radius: 9px; padding: 9px 16px; font: inherit; font-weight: 700; cursor: pointer; transition: transform .1s, opacity .15s; }
+  .btn:active { transform: scale(.97); }
+  .btn:disabled { opacity: .4; cursor: default; }
+  .primary { background: var(--teal); color: #fff; } .dark { background: var(--navy); color: #fff; }
+  .ghost { background: #fff; border: 1.5px solid var(--line); color: var(--navy); }
+  .small { padding: 5px 10px; font-size: 12px; font-weight: 600; }
+  .error { color: var(--red); font-weight: 600; font-size: 13px; margin-top: 12px; min-height: 18px; }
+  .empty { color: #9ca3af; text-align: center; padding: 60px 0; }
+  dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin-bottom: 14px; }
+  dt { color: var(--gray); font-size: 12.5px; } dd { font-weight: 600; word-break: break-all; }
+  #keyOut { min-height: 120px; resize: none; background: #f9fafb; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 11.5px; color: var(--gray); font-weight: 600; padding: 8px 8px 8px 0; border-bottom: 1.5px solid var(--line); }
+  td { padding: 8px 8px 8px 0; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  tr:last-child td { border-bottom: 0; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; }
+  .tag.red { background: var(--red-bg); color: var(--red); } .tag.amber { background: var(--amber-bg); color: var(--amber); }
+  .tag.green { background: var(--green-bg); color: var(--green); } .tag.gray { background: #f3f4f6; color: var(--gray); }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translate(-50%, 20px); background: var(--navy); color: #fff; padding: 9px 16px; border-radius: 9px; font-weight: 600; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .first-run { grid-column: 1 / -1; text-align: center; padding: 50px 22px; }
+  .first-run p { color: var(--gray); margin: 10px auto 20px; max-width: 520px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<header>
+  <div><div class="logo">School<span>Q</span> License Generator</div><div class="sub">Vyra Systems — internal. Never give this app to a school.</div></div>
+  <div class="keypill"><span class="pill" id="keyPill"></span><button class="btn ghost small" id="pickKey">Change key file…</button></div>
+</header>
+
+<main id="firstRun" hidden>
+  <div class="card first-run">
+    <h2>Select your signing key</h2>
+    <p>Licenses are signed with <b>license-private.pem</b> (from the <span class="mono">.keys</span> folder or your backup USB stick).
+      This app only remembers where the file is — the key is never copied into it.</p>
+    <button class="btn primary" id="pickKeyFirst">Select license-private.pem…</button>
+    <div class="error" id="pickError"></div>
+  </div>
+</main>
+
+<main id="app" hidden>
+  <section class="card">
+    <h2>New license</h2>
+    <form id="form" autocomplete="off">
+      <label for="school">School name</label>
+      <input type="text" id="school" placeholder="Al-Noor International School" />
+
+      <label for="machine">Server Machine ID</label>
+      <input type="text" id="machine" class="mono" placeholder="32 characters, from the school's activation screen" maxlength="40" />
+      <div class="hint">The key only works on that server PC.</div>
+
+      <label for="devices">Staff devices (at the same time)</label>
+      <div class="row">
+        <input type="number" id="devices" min="1" max="999" value="5" style="width: 110px" />
+        <label class="row" style="margin: 0; color: var(--navy); font-weight: 500"><input type="checkbox" id="unlimited" /> Unlimited</label>
+      </div>
+      <div class="hint">PCs with the Staff app or browsers signed in. The server PC, TV display and kiosk are free.</div>
+
+      <label>License type</label>
+      <div class="seg" role="group" aria-label="License type">
+        <button type="button" id="tPerpetual" aria-pressed="true">Perpetual</button>
+        <button type="button" id="tSubscription" aria-pressed="false">Subscription</button>
+      </div>
+      <div id="expiryBox" hidden>
+        <label for="expires">Expires on</label>
+        <div class="row">
+          <input type="date" id="expires" style="width: 180px" />
+          <button type="button" class="btn ghost small" data-add="1m">+1 month</button>
+          <button type="button" class="btn ghost small" data-add="6m">+6 months</button>
+          <button type="button" class="btn ghost small" data-add="1y">+1 year</button>
+        </div>
+        <div class="hint">Works until the end of this day, then 7 days of grace with warnings. The school is warned from 30 days before.</div>
+      </div>
+
+      <label for="voicePass">Voice Recordings password (optional)</label>
+      <input type="text" id="voicePass" placeholder="Leave empty to keep the page open" autocomplete="off" />
+      <div class="hint">Hides and locks the Voice Recordings page at this school. Only a scrambled version goes into the key; your history keeps the password for you.</div>
+
+      <label for="notes">Notes (only in your history)</label>
+      <input type="text" id="notes" placeholder="Invoice no., contact person…" />
+
+      <div class="error" id="formError"></div>
+      <button type="submit" class="btn primary" id="generate" style="width: 100%; margin-top: 6px">Generate license key</button>
+    </form>
+  </section>
+
+  <section class="card" id="result">
+    <h2>License key</h2>
+    <div class="empty" id="resultEmpty">Fill in the form and press <b>Generate</b>.</div>
+    <div id="resultBody" hidden>
+      <dl id="summary"></dl>
+      <textarea id="keyOut" class="mono" readonly aria-label="License key"></textarea>
+      <div class="row" style="margin-top: 10px">
+        <button class="btn dark" id="copyKey">Copy key</button>
+        <button class="btn ghost" id="saveKey">Save as .txt…</button>
+      </div>
+      <div class="hint" style="margin-top: 8px">The school pastes it on the activation screen — or in Admin › License › Renew to renew or upgrade.</div>
+    </div>
+  </section>
+
+  <section class="card wide">
+    <div class="row" style="margin-bottom: 12px">
+      <h2 style="margin: 0 auto 0 0">History</h2>
+      <input type="search" id="search" placeholder="Search school, Machine ID, notes…" style="width: 280px" />
+      <button class="btn ghost small" id="exportCsv">Export CSV</button>
+    </div>
+    <div id="historyEmpty" class="empty" style="padding: 24px 0">No licenses issued yet.</div>
+    <table id="historyTable" hidden>
+      <thead><tr><th>No.</th><th>School</th><th>Devices</th><th>Expires</th><th>Issued</th><th>Machine ID</th><th></th></tr></thead>
+      <tbody id="historyRows"></tbody>
+    </table>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  let type = 'perpetual';
+  let history = [];
+  let current = null;
+
+  const toast = (msg) => { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 1600); };
+  const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const nice = (s) => (s ? new Date(s + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '');
+  const daysLeft = (s) => Math.round((new Date(s + 'T00:00:00') - new Date(ymd(new Date()) + 'T00:00:00')) / 86400000);
+
+  // ── Signing key ──
+  async function showKeyState(st) {
+    const pill = $('keyPill');
+    pill.className = 'pill ' + (st.keyOk ? 'ok' : 'bad');
+    pill.textContent = st.keyOk ? `Signing key: ${st.keyPath}` : st.reason;
+    pill.title = st.keyPath || '';
+    $('firstRun').hidden = !!st.keyPath;
+    $('app').hidden = !st.keyPath;
+    $('generate').disabled = !st.keyOk;
+    $('pickError').textContent = st.pickError || '';
+  }
+  async function pickKey() { showKeyState(await window.gen.pickKey()); }
+  $('pickKey').onclick = pickKey;
+  $('pickKeyFirst').onclick = pickKey;
+
+  // ── Form ──
+  function setType(t) {
+    type = t;
+    $('tPerpetual').setAttribute('aria-pressed', t === 'perpetual');
+    $('tSubscription').setAttribute('aria-pressed', t === 'subscription');
+    $('expiryBox').hidden = t !== 'subscription';
+    if (t === 'subscription' && !$('expires').value) addToExpiry('1y', true);
+  }
+  $('tPerpetual').onclick = () => setType('perpetual');
+  $('tSubscription').onclick = () => setType('subscription');
+  $('unlimited').onchange = () => { $('devices').disabled = $('unlimited').checked; };
+
+  function addToExpiry(step, fromToday = false) {
+    const cur = $('expires').value;
+    const base = !fromToday && cur && daysLeft(cur) > 0 ? new Date(cur + 'T00:00:00') : new Date();
+    if (step === '1m') base.setMonth(base.getMonth() + 1);
+    if (step === '6m') base.setMonth(base.getMonth() + 6);
+    if (step === '1y') base.setFullYear(base.getFullYear() + 1);
+    $('expires').value = ymd(base);
+  }
+  document.querySelectorAll('[data-add]').forEach(b => { b.onclick = () => addToExpiry(b.dataset.add); });
+
+  $('form').onsubmit = async (e) => {
+    e.preventDefault();
+    $('formError').textContent = '';
+    const res = await window.gen.mint({
+      school: $('school').value,
+      machine: $('machine').value,
+      devices: $('unlimited').checked ? null : $('devices').value,
+      expires: type === 'subscription' ? $('expires').value : null,
+      voicePass: $('voicePass').value,
+      notes: $('notes').value,
+    });
+    if (res.error) { $('formError').textContent = res.error; return; }
+    showResult(res.entry);
+    toast('License key generated');
+    loadHistory();
+  };
+
+  // ── Result ──
+  function showResult(entry) {
+    current = entry;
+    $('resultEmpty').hidden = true;
+    $('resultBody').hidden = false;
+    const dl = $('summary');
+    dl.replaceChildren();
+    const add = (k, v) => { const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v; dl.append(dt, dd); };
+    add('School', entry.school);
+    add('License No.', entry.id);
+    add('Type', entry.expires ? `Subscription — until ${nice(entry.expires)}` : 'Perpetual');
+    add('Staff devices', entry.devices || 'Unlimited');
+    add('Machine ID', entry.machine);
+    add('Voice Recordings', entry.voicePassword ? `Locked — password: ${entry.voicePassword}` : 'Open (no password)');
+    $('keyOut').value = entry.key;
+  }
+  $('copyKey').onclick = async () => { await window.gen.copy(current.key); toast('Key copied'); };
+  $('saveKey').onclick = async () => { if (await window.gen.saveKey(current)) toast('Saved'); };
+
+  // ── History ──
+  async function loadHistory() { history = await window.gen.history(); renderHistory(); }
+  function renderHistory() {
+    const q = $('search').value.trim().toLowerCase();
+    const rows = history.filter(h => !q || [h.school, h.machine, h.notes, h.id].some(v => String(v || '').toLowerCase().includes(q)));
+    $('historyEmpty').hidden = history.length > 0;
+    $('historyTable').hidden = history.length === 0;
+    const body = $('historyRows');
+    body.replaceChildren();
+    for (const h of rows) {
+      const tr = document.createElement('tr');
+      const td = (text, cls) => { const c = document.createElement('td'); if (cls) c.className = cls; c.textContent = text; tr.append(c); return c; };
+      td(h.id, 'mono');
+      const s = td(h.school); s.style.fontWeight = '600'; s.dir = 'auto';
+      if (h.notes) { const n = document.createElement('div'); n.className = 'hint'; n.textContent = h.notes; s.append(n); }
+      td(h.devices || 'Unlimited');
+      const ex = td('');
+      const tag = document.createElement('span');
+      if (!h.expires) { tag.className = 'tag gray'; tag.textContent = 'Perpetual'; }
+      else {
+        const d = daysLeft(h.expires);
+        tag.className = 'tag ' + (d < 0 ? 'red' : d <= 30 ? 'amber' : 'green');
+        tag.textContent = nice(h.expires) + (d < 0 ? ' · expired' : d <= 30 ? ` · ${d} days` : '');
+      }
+      ex.append(tag);
+      td(nice(h.issued));
+      const m = td(h.machine.slice(0, 10) + '…', 'mono'); m.title = h.machine;
+      const act = td('');
+      const b1 = document.createElement('button'); b1.className = 'btn ghost small'; b1.textContent = 'Copy key';
+      b1.onclick = async () => { await window.gen.copy(h.key); toast('Key copied'); };
+      const b2 = document.createElement('button'); b2.className = 'btn ghost small'; b2.textContent = 'Renew'; b2.style.marginLeft = '6px';
+      b2.onclick = () => renew(h);
+      act.append(b1, b2);
+      body.append(tr);
+    }
+  }
+  $('search').oninput = renderHistory;
+  $('exportCsv').onclick = async () => { if (await window.gen.exportCsv()) toast('History exported'); };
+
+  // Renew: same school, PC and devices — new expiry one year after the old one (or from today)
+  function renew(h) {
+    $('school').value = h.school;
+    $('machine').value = h.machine;
+    $('unlimited').checked = !h.devices;
+    $('devices').disabled = !h.devices;
+    $('devices').value = h.devices || 5;
+    $('voicePass').value = h.voicePassword || '';
+    $('notes').value = h.notes ? `Renewal of ${h.id} — ${h.notes}` : `Renewal of ${h.id}`;
+    if (h.expires) {
+      $('expires').value = h.expires;
+      setType('subscription');
+      addToExpiry('1y');
+    } else {
+      setType('perpetual');
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    $('school').focus();
+    toast('Form filled — check and press Generate');
+  }
+
+  window.gen.state().then(showKeyState);
+  loadHistory();
+</script>
+</body>
+</html>

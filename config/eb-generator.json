@@ -1,0 +1,30 @@
+{"appId": "com.vyrasystems.schoolqueue.licensegenerator",
+  "productName": "SchoolQ License Generator",
+  "npmRebuild": false,
+  "directories": {
+    "output": "dist-generator",
+    "buildResources": "electron"
+  },
+  "extraMetadata": {
+    "version": "1.0.0",
+    "main": "tools/license-generator/main.js"
+  },
+  "files": [
+    "tools/license-generator/**/*",
+    "electron/license.js",
+    "package.json",
+    "!node_modules/**/*"
+  ],
+  "win": {
+    "target": ["nsis"],
+    "forceCodeSigning": false,
+    "signAndEditExecutable": false
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "SchoolQ License Generator"
+  }
+}
