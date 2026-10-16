@@ -32,7 +32,8 @@ function keyState() {
   }
 }
 
-ipcMain.handle('gen:state', () => keyState());
+// Installed: the generator's own version (config/eb-generator.json); from source: "dev"
+ipcMain.handle('gen:state', () => ({ ...keyState(), version: app.isPackaged ? app.getVersion() : 'dev' }));
 
 ipcMain.handle('gen:pickKey', async (e) => {
   const { canceled, filePaths } = await dialog.showOpenDialog(BrowserWindow.fromWebContents(e.sender), {

@@ -255,7 +255,7 @@ const metaRows = [
   ['Product',      'SchoolQ — Queue Management System'],
   ['Client',       'Al-Noor International School'],
   ['Generated',    new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })],
-  ['Versions',     'v1.2.0 → v1.13.0  (40 releases)'],
+  ['Versions',     'v1.2.0 → v1.13.1  (41 releases)'],
 ];
 metaRows.forEach(([k, v], i) => {
   doc.fontSize(8.5).fillColor(C.teal).font('Helvetica-Bold').text(k, 74, 295 + i * 13, { lineBreak: false, width: 90 });
@@ -302,6 +302,7 @@ const idx = [
   { v:'1.11.0', date:'15 Oct 2026', label:'Listen & Fix Recordings',                type:'minor'  },
   { v:'1.12.0', date:'16 Oct 2026', label:'Licensing: Devices, Expiry, Generator',  type:'minor'  },
   { v:'1.13.0', date:'17 Oct 2026', label:'Voice Password, Backup & Move Voices',    type:'minor'  },
+  { v:'1.13.1', date:'17 Oct 2026', label:'Change the Voice Password per School',  type:'patch'  },
 ];
 const typeBadgeColors = {
   initial:'#3B82F6', patch:'#16A34A', security:'#DC2626',
@@ -1665,6 +1666,28 @@ fileTable([
 ]);
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  v1.13.1 — CHANGE A SCHOOL'S VOICE PASSWORD
+// ─────────────────────────────────────────────────────────────────────────────
+versionHeader({
+  version: '1.13.1', date: '17 Oct 2026', type: 'patch',
+  commit: 'this release',
+  summary: 'A New Voice Password Takes Effect at Once; License Generator 1.1.0',
+  stats: { files: 6, added: 70, removed: 12 },
+});
+bullet('To change the Voice Recordings password of a school: Renew in the generator, type the new password, send the key');
+sub('As soon as the school pastes it (Admin > License), the old password and any open unlock stop working');
+sub('Before: an unlock made with the old password kept working for up to 12 hours');
+sub('A key without a password opens the page again for everyone');
+bullet('License Generator 1.1.0: shows its version, a Voice password column in the history (hidden until Show)');
+sub('The first generator build (also called 1.0.0) had no password field - install 1.1.0 over it, history is kept');
+bullet('Verified: 82 unit tests, generator E2E 19/19, password change E2E 6/6, voice lock + backup E2E 26/26');
+fileTable([
+  { path: 'src/backend/voiceLock.js',          added: 20, removed: 10, note: 'unlock tied to the current password' },
+  { path: 'tools/license-generator/',          added: 18, removed: 2,  note: 'version, password column, hint' },
+  { path: 'src/backend/tests/voiceLock.test.js', added: 13, removed: 0, note: '+1 test' },
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  SUMMARY PAGE
 // ─────────────────────────────────────────────────────────────────────────────
 newPage();
@@ -1715,6 +1738,7 @@ const timeline = [
   { v:'v1.11.0', date:'15 Oct 2026', type:'minor',    desc:'Listen & fix: hear every clip, flag, redo, compare old vs new take' },
   { v:'v1.12.0', date:'16 Oct 2026', type:'minor',    desc:'Licensing: Staff device limit, expiry alerts, License tab, generator app' },
   { v:'v1.13.0', date:'17 Oct 2026', type:'minor',    desc:'Vyra password for Voice Recordings, voices + engine as files, Settings fix' },
+  { v:'v1.13.1', date:'17 Oct 2026', type:'patch',    desc:'Changed voice password takes effect at once; License Generator 1.1.0' },
 ];
 const tc = { initial:C.navy, patch:C.green, security:C.red, fix:C.amber, minor:C.blue, ux:C.purple };
 timeline.forEach((r, i) => {
@@ -1731,7 +1755,7 @@ timeline.forEach((r, i) => {
 
 sectionTitle('Cumulative Change Statistics');
 const stats = [
-  ['Total versions released',      '40 (v1.2.0 → v1.13.0)'],
+  ['Total versions released',      '41 (v1.2.0 → v1.13.1)'],
   ['Total git commits',            '25+ commits on main branch'],
   ['Total files ever modified',    '~80 unique files touched'],
   ['Lines added across all commits','~22,000+'],
@@ -1740,7 +1764,7 @@ const stats = [
   ['Frontend files modified',      '~30 (pages, components, stores, hooks)'],
   ['New files created',            '13 (audit.js, settingsCache.js, validate.js, errorHandler.js,\n                         runner.js, Toast.jsx, useToastStore.js, 2 new pages, 3 test files, scripts/)'],
   ['Files deleted',                '2 (AdminPanel.jsx, DisplayMonitor.jsx — legacy)'],
-  ['Test coverage',                '81 tests — auth, validation, queue logic, LAN discovery, offline voice, voice engine, voices, takes, licensing, devices, voice lock, backup'],
+  ['Test coverage',                '82 tests — auth, validation, queue logic, LAN discovery, offline voice, voice engine, voices, takes, licensing, devices, voice lock, backup'],
   ['Supported platforms',          'Windows 10/11 x64 (Electron 41)'],
   ['Node.js runtime (backend)',    'Electron bundled Node (v24-based, ABI 145)'],
 ];
@@ -1756,7 +1780,7 @@ const mat = [
   { area:'Database Design',            grade:'B',  color:C.teal,   note:'WAL, foreign keys, 10 indexes, migration runner, transactions' },
   { area:'Real-time Features',         grade:'A-', color:C.green,  note:'Socket.io with auth, force-logout events, dept rooms, user tracking' },
   { area:'Logging & Audit',            grade:'C+', color:C.amber,  note:'Audit log table + morgan; no structured logging, no rotation' },
-  { area:'Testing',                    grade:'C+', color:C.amber,  note:'81 unit tests; E2E run manually, not automated; no CI pipeline' },
+  { area:'Testing',                    grade:'C+', color:C.amber,  note:'82 unit tests; E2E run manually, not automated; no CI pipeline' },
   { area:'Code Organization',          grade:'B+', color:C.green,  note:'Clean route/controller split, Zustand, API layer, no fat controllers' },
   { area:'User Experience',            grade:'B',  color:C.teal,   note:'Toast system, skeleton loaders, real-time updates, bilingual voice' },
   { area:'Build & Deployment',         grade:'B-', color:C.amber,  note:'2 installer targets, per-install secret; no auto-update, no code signing' },

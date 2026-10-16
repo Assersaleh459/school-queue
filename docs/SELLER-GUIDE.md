@@ -92,7 +92,11 @@ To stop a school from changing voices, type a **Voice Recordings password** in t
 - At that school, the **Voice Recordings** tab is hidden. To open it, use **Settings → "Voice tools (Vyra Systems)"** (at the bottom of the page) and enter the password. It stays unlocked for that window until **Lock again**, closing SchoolQ, or 12 hours.
 - Five wrong tries in a row block unlocking for 5 minutes.
 - The TV display, recorded calls and "Announce on display" keep working while the page is locked.
-- Your generator history keeps the readable password, and **Renew** carries it over. To change or remove it, issue a new key.
+- Your generator history keeps the readable password (hidden until you press **Show**).
+- **To change a school's password:** in the generator's History, press **Renew** on that school. Type the new password (or clear it to remove the lock), **Generate**, and send the key. The school pastes it in **Admin → License → Renew or upgrade**. From that moment:
+  - the old password stops working;
+  - anyone who had unlocked the page is locked out again.
+- The generator shows its version in the header. The password field needs **License Generator 1.1.0** or later; if you don't see it, install the new generator over the old one (your history is kept).
 
 ---
 

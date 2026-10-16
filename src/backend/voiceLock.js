@@ -1,6 +1,9 @@
 // Voice Recordings lock: when the school's license carries a Vyra password (voicePass), the
 // voice tools are hidden and every voice admin API needs an unlock token from POST /voice/unlock.
 // The displays (manifest, clips) and "Announce on display" are never locked.
+// An unlock token only fits the password it was given for: a new key with another password
+// locks everyone again at once.
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const lic = require('./license');
 const { checkVoicePass } = require('../../electron/license');
@@ -12,6 +15,8 @@ const fails = new Map();      // user_id → { count, until }
 
 const passHash = () => lic.current()?.payload?.voicePass || null;
 const isLocked = () => !!passHash();
+// Which password a token was issued for (a fingerprint of the hash, not the hash itself)
+const fingerprint = (hash) => crypto.createHash('sha256').update(hash).digest('hex').slice(0, 16);
 
 // → { ok, token } | { ok:false, error, wait? }
 function unlock(userId, password) {
@@ -25,23 +30,27 @@ function unlock(userId, password) {
     return { ok: false, error: 'Wrong password' };
   }
   fails.delete(userId);
-  return { ok: true, token: jwt.sign({ voice_unlock: true, user_id: userId }, process.env.JWT_SECRET, { expiresIn: `${UNLOCK_HOURS}h` }) };
+  const token = jwt.sign({ voice_unlock: true, user_id: userId, pw: fingerprint(hash) }, process.env.JWT_SECRET, { expiresIn: `${UNLOCK_HOURS}h` });
+  return { ok: true, token };
+}
+
+// The token's claims if it unlocks the current password, else null
+function valid(token) {
+  try {
+    const t = jwt.verify(String(token || ''), process.env.JWT_SECRET);
+    return t.voice_unlock && t.pw === fingerprint(passHash()) ? t : null;
+  } catch { return null; }   // missing / expired / wrong
 }
 
 // After authMiddleware: voice admin APIs need the unlock token while locked
 function voiceGuard(req, res, next) {
   if (!isLocked()) return next();
-  try {
-    const t = jwt.verify(String(req.get('X-Voice-Unlock') || ''), process.env.JWT_SECRET);
-    if (t.voice_unlock && t.user_id === req.user.user_id) return next();
-  } catch { /* missing / expired / wrong */ }
+  const t = valid(req.get('X-Voice-Unlock'));
+  if (t && t.user_id === req.user.user_id) return next();
   res.status(423).json({ error: 'Voice Recordings is locked', code: 'voice_locked' });
 }
 
 // For the server PC's own engine export / import (Electron IPC): same rule, no request
-function tokenOk(token) {
-  if (!isLocked()) return true;
-  try { return !!jwt.verify(String(token || ''), process.env.JWT_SECRET).voice_unlock; } catch { return false; }
-}
+const tokenOk = (token) => !isLocked() || !!valid(token);
 
 module.exports = { isLocked, unlock, voiceGuard, tokenOk, reset: () => fails.clear() };

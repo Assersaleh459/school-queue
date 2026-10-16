@@ -40,3 +40,16 @@ test('5 wrong passwords → a few minutes wait, even with the right one', () => 
   expect(voiceLock.unlock(7, 'Vyra#2026')).toMatchObject({ ok: false, wait: true });
   expect(voiceLock.unlock(8, 'Vyra#2026').ok).toBe(true);                        // other users unaffected
 });
+
+test('a new key with another password locks everyone again at once; a key without one opens the page', () => {
+  mockPayload = { voicePass: hashVoicePass('Old-pass-1') };
+  const { token } = voiceLock.unlock(1, 'Old-pass-1');
+  expect(run({ 'X-Voice-Unlock': token }).passed).toBe(true);
+  mockPayload = { voicePass: hashVoicePass('New-pass-2') };          // school pasted the renewed key
+  expect(run({ 'X-Voice-Unlock': token }).res.code).toBe(423);
+  expect(voiceLock.tokenOk(token)).toBe(false);
+  expect(voiceLock.unlock(1, 'Old-pass-1').ok).toBe(false);
+  expect(run({ 'X-Voice-Unlock': voiceLock.unlock(1, 'New-pass-2').token }).passed).toBe(true);
+  mockPayload = { };                                                  // key without a password
+  expect(run().passed).toBe(true);
+});

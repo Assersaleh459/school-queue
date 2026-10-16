@@ -60,7 +60,7 @@
 </head>
 <body>
 <header>
-  <div><div class="logo">School<span>Q</span> License Generator</div><div class="sub">Vyra Systems — internal. Never give this app to a school.</div></div>
+  <div><div class="logo">School<span>Q</span> License Generator</div><div class="sub">Vyra Systems — internal. Never give this app to a school. · <span id="appVersion"></span></div></div>
   <div class="keypill"><span class="pill" id="keyPill"></span><button class="btn ghost small" id="pickKey">Change key file…</button></div>
 </header>
 
@@ -110,7 +110,7 @@
 
       <label for="voicePass">Voice Recordings password (optional)</label>
       <input type="text" id="voicePass" placeholder="Leave empty to keep the page open" autocomplete="off" />
-      <div class="hint">Hides and locks the Voice Recordings page at this school. Only a scrambled version goes into the key; your history keeps the password for you.</div>
+      <div class="hint">Hides and locks the Voice Recordings page at this school. Only a scrambled version goes into the key; your history keeps the password for you. To change a school's password: <b>Renew</b> it in the History, type the new password here, and send the new key — it works as soon as the school pastes it in Admin › License.</div>
 
       <label for="notes">Notes (only in your history)</label>
       <input type="text" id="notes" placeholder="Invoice no., contact person…" />
@@ -142,7 +142,7 @@
     </div>
     <div id="historyEmpty" class="empty" style="padding: 24px 0">No licenses issued yet.</div>
     <table id="historyTable" hidden>
-      <thead><tr><th>No.</th><th>School</th><th>Devices</th><th>Expires</th><th>Issued</th><th>Machine ID</th><th></th></tr></thead>
+      <thead><tr><th>No.</th><th>School</th><th>Devices</th><th>Expires</th><th>Issued</th><th>Machine ID</th><th>Voice password</th><th></th></tr></thead>
       <tbody id="historyRows"></tbody>
     </table>
   </section>
@@ -163,6 +163,7 @@
 
   // ── Signing key ──
   async function showKeyState(st) {
+    if (st.version) $('appVersion').textContent = `version ${st.version}`;
     const pill = $('keyPill');
     pill.className = 'pill ' + (st.keyOk ? 'ok' : 'bad');
     pill.textContent = st.keyOk ? `Signing key: ${st.keyPath}` : st.reason;
@@ -261,6 +262,15 @@
       ex.append(tag);
       td(nice(h.issued));
       const m = td(h.machine.slice(0, 10) + '…', 'mono'); m.title = h.machine;
+      // Voice password: hidden until "Show"
+      const vp = td('');
+      if (!h.voicePassword) { vp.textContent = '—'; vp.style.color = '#9ca3af'; }
+      else {
+        const val = document.createElement('span'); val.className = 'mono'; val.textContent = '••••••';
+        const show = document.createElement('button'); show.className = 'btn ghost small'; show.textContent = 'Show'; show.style.marginLeft = '6px';
+        show.onclick = () => { const hidden = show.textContent === 'Show'; val.textContent = hidden ? h.voicePassword : '••••••'; show.textContent = hidden ? 'Hide' : 'Show'; };
+        vp.append(val, show);
+      }
       const act = td('');
       const b1 = document.createElement('button'); b1.className = 'btn ghost small'; b1.textContent = 'Copy key';
       b1.onclick = async () => { await window.gen.copy(h.key); toast('Key copied'); };
