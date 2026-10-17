@@ -1,4 +1,4 @@
-export default function TicketReceipt({ ticket, schoolName = 'Al-Noor School', ticketSettings = {}, closeLabel = 'CREATE ANOTHER TICKET', onClose }) {
+export default function TicketReceipt({ ticket, schoolName = 'My School', ticketSettings = {}, closeLabel = 'CREATE ANOTHER TICKET', onClose }) {
   const handlePrint = () => window.print();
 
   const show = (key) => ticketSettings[key] !== 'false';

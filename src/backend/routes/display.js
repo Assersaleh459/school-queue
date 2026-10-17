@@ -38,7 +38,7 @@ router.get('/current', (req, res) => {
       };
     });
 
-    res.json({ departments, display_data, school_name: getSetting('school_name', 'Al-Noor International School') });
+    res.json({ departments, display_data, school_name: getSetting('school_name', 'My School') });
   } catch (error) {
     console.error('Display data error:', error);
     res.status(500).json({ error: 'Failed to fetch display data' });

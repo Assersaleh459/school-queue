@@ -23,7 +23,7 @@ export default function AllQueues() {
   const [now, setNow]                     = useState(Date.now());
   const [maxWait, setMaxWait]             = useState(null);
   const [ticketSettings, setTicketSettings] = useState({});
-  const [schoolName, setSchoolName]       = useState('Al-Noor School');
+  const [schoolName, setSchoolName]       = useState('My School');
 
   // Reprint
   const [reprintTicket, setReprintTicket] = useState(null);

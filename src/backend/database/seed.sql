@@ -15,7 +15,7 @@ INSERT OR IGNORE INTO service_categories VALUES
 (9, 3, 'Academic Counseling', 15, 1);
 
 INSERT OR IGNORE INTO settings VALUES
-('school_name', 'Al-Noor International School', 'string'),
+('school_name', 'My School', 'string'),
 ('primary_color', '#19224A', 'string'),
 ('secondary_color', '#5FAEB6', 'string'),
 ('working_hours_start', '08:00', 'string'),

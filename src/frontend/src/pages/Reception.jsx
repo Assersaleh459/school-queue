@@ -22,7 +22,7 @@ export default function Reception() {
   const [queuePosition, setQueuePosition] = useState(null);
   const [waitEstimate, setWaitEstimate]   = useState(null); // { minutes, ahead, perService }
   const [createdTicket, setCreatedTicket] = useState(null);
-  const [schoolName, setSchoolName]       = useState('Al-Noor School');
+  const [schoolName, setSchoolName]       = useState('My School');
   const [ticketSettings, setTicketSettings] = useState({});
 
   const user   = useAuthStore(state => state.user);

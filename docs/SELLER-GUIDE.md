@@ -27,7 +27,7 @@ How to issue licenses and sell SchoolQ to multiple schools. **Internal — do no
 
 ## Issuing a license: the License Generator app
 
-Build it once with `npm run dist:generator`, then install `dist-generator\SchoolQ License Generator Setup 1.0.0.exe` **on your own PC only**.
+Build it once with `npm run dist:generator`, then install `dist-generator\SchoolQ License Generator Setup 1.1.0.exe` **on your own PC only**.
 
 1. **First run:** select `license-private.pem`. The app remembers where the file is, but it never copies the key, so the app is harmless if someone else gets it. If the key is on a USB stick, plug the stick in when you make licenses.
 2. **Ask the school for its Machine ID.** It is shown on the activation screen of SchoolQ Server (with a Copy button) and under Admin → License.
@@ -118,6 +118,36 @@ The fastest setup for a new school:
 3. **Import engine**.
 4. **Import voices**.
 5. Choose the voices for calls and announcements.
+
+---
+
+## Handover checklist (new school)
+
+Tick each step before you leave the school.
+
+**Before the visit**
+- [ ] Build fresh installers: `npm run dist:server` and `npm run dist:staff`. Copy the newest `SchoolQ Server Setup x.y.z.exe` and `SchoolQ Staff Setup x.y.z.exe` from `dist\` to a USB stick.
+- [ ] Copy the `.schoolq-engine` file and a `.schoolq-voices` file to the same stick (exFAT or NTFS). See "Moving voices" above.
+- [ ] **Don't** copy the License Generator, `license-private.pem` or this guide onto the stick.
+
+**On the server PC**
+- [ ] Install SchoolQ Server and choose **Server** on the first-time setup screen.
+- [ ] Send yourself the **Machine ID** from the activation screen. Make the key in the License Generator (seats, expiry, Voice Recordings password). Paste it and press **Activate**.
+- [ ] Sign in as `admin` / `admin123`, then **change the password at once** with the **🔑 Password** button on the home screen. Give the new password only to the school's admin.
+- [ ] **Admin → Settings:** set the school name (new installs start as "My School"), colours, logo and working hours.
+- [ ] **Admin → Departments:** replace the 3 example departments (Administration, Accounting, Student Relations) and their services with the school's own.
+- [ ] **Admin → Users:** make one account per staff member, with only the pages they need. Don't share the admin account.
+- [ ] **Voice Recordings → Backup & move:** **Import engine**, then **Import voices**. Choose the voices for calls and announcements, then test a call.
+
+**Staff PCs, TV and kiosk**
+- [ ] Install SchoolQ Staff on each staff PC. Check it finds the server, then sign in with that person's own account.
+- [ ] Open the TV display and the kiosk. Issue a test ticket and call it. Check the TV shows it and the voice plays.
+- [ ] **Admin → License:** check the devices count is right.
+
+**Before you leave**
+- [ ] Clear your test tickets with **Admin → Settings → Reset Tickets** (this deletes **all** tickets, so do it only before the school starts using SchoolQ).
+- [ ] Write down for the school: the server PC name, where SchoolQ is installed, and how to reach you. Write the admin password only on the school's own copy.
+- [ ] Record the license in the generator's History (notes: invoice number, handover date).
 
 ---
 

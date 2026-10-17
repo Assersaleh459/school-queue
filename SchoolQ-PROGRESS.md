@@ -1,6 +1,6 @@
 # SchoolQ: progress
 
-Last updated: 2026-10-17. Current version **1.13.1**, pushed to GitHub `main` as `70d962e`.
+Last updated: 2026-10-17. Current version **1.13.2**.
 
 ## Done (recent)
 | Version | What |
@@ -11,8 +11,9 @@ Last updated: 2026-10-17. Current version **1.13.1**, pushed to GitHub `main` as
 | 1.12.0 | Licensing: offline machine-bound license keys, seat limits for Staff, Admin → License tab, License Generator app |
 | 1.13.0 | Per-school Voice Recordings password (set in the License Generator). Voices/engine **Backup & move** (`.schoolq-voices`, `.schoolq-engine`). A Settings scroll-jump fix |
 | 1.13.1 | A changed voice password takes effect at once. License Generator 1.1.0, with password history and a Show button |
+| 1.13.2 | Neutral installer: new installs start as "My School" (seed, fallbacks, setup screen, package description). Handover checklist in `docs/SELLER-GUIDE.md`. Existing installs keep their name |
 
-Tests at 1.13.1: 74 backend + 8 frontend unit tests, generator 19/19, password change 6/6, voice lock + backup 26/26.
+Tests at 1.13.2: 74 backend (run `devices.test.js` under Electron, see SchoolQ-CLAUDE.md) + 8 frontend unit tests.
 
 ## In progress
 - Nothing. The last session ended with everything committed and pushed.
@@ -23,5 +24,6 @@ Tests at 1.13.1: 74 backend + 8 frontend unit tests, generator 19/19, password c
 
 ## Known issues / reminders
 - **Live admin account still uses the default password.** Change it before handing to a school.
+- **New installs still use `admin` / `admin123`.** Nothing forces a change; the handover checklist says to change it at once.
 - **Two untracked files the user didn't ask to commit:** `2026-10-15-170512-this-session-...txt` (a saved transcript) and `docs/SELLER-GUIDETXT.txt` (an old copy). Keep or delete them.
 - **Version bump:** after every change, bump all 4 version files (see SchoolQ-CLAUDE.md).

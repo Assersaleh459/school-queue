@@ -93,7 +93,7 @@ export default function Home() {
   const navigate  = useNavigate();
   const user      = useAuthStore(s => s.user);
   const logout    = useAuthStore(s => s.logout);
-  const [schoolName, setSchoolName] = useState('Al-Noor International School');
+  const [schoolName, setSchoolName] = useState('My School');
   const [pwModal, setPwModal]       = useState(false);
 
   useEffect(() => {

@@ -1,5 +1,5 @@
 {
-  "schoolName": "Al-Noor International School",
+  "schoolName": "My School",
   "departments": [
     {"id": 1, "name": "Administration", "code": "ADM", "color": "#19224A"},
     {"id": 2, "name": "Accounting", "code": "ACC", "color": "#5FAEB6"},

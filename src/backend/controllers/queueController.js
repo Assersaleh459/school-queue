@@ -30,7 +30,7 @@ exports.getDisplayData = (req, res) => {
     now_calling,
     queue_counts,
     announcements,
-    school_name: getSetting('school_name', 'Al-Noor International School')
+    school_name: getSetting('school_name', 'My School')
   });
 };
 

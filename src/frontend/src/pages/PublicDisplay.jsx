@@ -99,7 +99,7 @@ function applyVars(template, number, department, lang, departmentAr, room) {
 export default function PublicDisplay() {
   const [departments, setDepartments]     = useState([]);
   const [displayData, setDisplayData]     = useState({});
-  const [schoolName, setSchoolName]       = useState('Al-Noor International School');
+  const [schoolName, setSchoolName]       = useState('My School');
   const [schoolLogo, setSchoolLogo]       = useState(null);
   const [currentTime, setCurrentTime]     = useState(new Date());
   const [announcements, setAnnouncements] = useState([]);

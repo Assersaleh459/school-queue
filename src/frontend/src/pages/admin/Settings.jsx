@@ -738,7 +738,7 @@ export default function Settings() {
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 no-print">
           <TicketReceipt
             ticket={reprintTicket}
-            schoolName={settings.school_name || 'Al-Noor School'}
+            schoolName={settings.school_name || 'My School'}
             ticketSettings={settings}
             closeLabel="Close"
             onClose={() => setShowReprintReceipt(false)}
