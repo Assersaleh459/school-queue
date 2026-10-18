@@ -29,7 +29,7 @@ Tests at 1.15.2: 95 backend under Node (5 new for the password rule) + 11 under 
 Tests at 1.16.0: 104 backend under Node (9 new: `voiceRoutes.test.js`, 2 engine tests) + 13 under Electron (`devices`, `schoolSetup`, new `wipe.test.js`) + 9 frontend; frontend build OK; browser test on a clean test server (port 3951, test license with a voice password, this PC only, 3-day expiry) 21/21: fresh install = 1 user and empty tables, tab hidden until unlocked and for admin role, ❌ in both lists, "Not recorded" label/toast (gone once recorded, none in online mode), wrong password refused, wipe → login → `admin123` → forced new password, backups present.
 
 ## In progress
-- 1.15.2 + 1.16.0 are committed and pushed, but **installers are not built** yet (`npm run dist:server`, `npm run dist:staff`). 1.15.1 installers are in `dist\`; `dist-generator\SchoolQ License Generator Setup 1.2.0.exe`.
+- **1.16.0 installers built 2026-10-19:** `dist\SchoolQ Server Setup 1.16.0.exe` and `dist\SchoolQ Staff Setup 1.16.0.exe` (about 102 MB each; Staff app.asar checked, no secret files). Not install-tested yet. `dist-generator\SchoolQ License Generator Setup 1.2.0.exe`.
 - `config/settings.json` (unused sample departments) was deleted in 1.16.0. 🗑 "delete recording only" now also refreshes Listen & fix.
 
 ## Next
