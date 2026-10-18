@@ -79,7 +79,7 @@
     <h2>New license</h2>
     <form id="form" autocomplete="off">
       <label for="school">School name</label>
-      <input type="text" id="school" placeholder="Al-Noor International School" />
+      <input type="text" id="school" placeholder="e.g. Green Valley School" />
 
       <label for="machine">Server Machine ID</label>
       <input type="text" id="machine" class="mono" placeholder="32 characters, from the school's activation screen" maxlength="40" />
@@ -105,7 +105,10 @@
           <button type="button" class="btn ghost small" data-add="6m">+6 months</button>
           <button type="button" class="btn ghost small" data-add="1y">+1 year</button>
         </div>
-        <div class="hint">Works until the end of this day, then 7 days of grace with warnings. The school is warned from 30 days before.</div>
+        <div class="hint">Works until the end of this day. The school is warned from 30 days before.</div>
+        <label for="grace">Grace period after expiry (days)</label>
+        <input type="number" id="grace" min="0" max="60" value="0" style="width: 110px" />
+        <div class="hint">0 = SchoolQ stops the day after the expiry date. Otherwise it keeps working this many days, with a red warning bar on staff screens.</div>
       </div>
 
       <label for="voicePass">Voice Recordings password (optional)</label>
@@ -207,6 +210,7 @@
       machine: $('machine').value,
       devices: $('unlimited').checked ? null : $('devices').value,
       expires: type === 'subscription' ? $('expires').value : null,
+      grace: type === 'subscription' ? $('grace').value : 0,
       voicePass: $('voicePass').value,
       notes: $('notes').value,
     });
@@ -227,6 +231,7 @@
     add('School', entry.school);
     add('License No.', entry.id);
     add('Type', entry.expires ? `Subscription — until ${nice(entry.expires)}` : 'Perpetual');
+    if (entry.expires) add('Grace after expiry', entry.grace ? `${entry.grace} day${entry.grace === 1 ? '' : 's'}` : 'None');
     add('Staff devices', entry.devices || 'Unlimited');
     add('Machine ID', entry.machine);
     add('Voice Recordings', entry.voicePassword ? `Locked — password: ${entry.voicePassword}` : 'Open (no password)');
@@ -260,6 +265,7 @@
         tag.textContent = nice(h.expires) + (d < 0 ? ' · expired' : d <= 30 ? ` · ${d} days` : '');
       }
       ex.append(tag);
+      if (h.expires && h.grace) { const g = document.createElement('div'); g.className = 'hint'; g.textContent = `+${h.grace} days grace`; ex.append(g); }
       td(nice(h.issued));
       const m = td(h.machine.slice(0, 10) + '…', 'mono'); m.title = h.machine;
       // Voice password: hidden until "Show"
@@ -292,6 +298,7 @@
     $('devices').value = h.devices || 5;
     $('voicePass').value = h.voicePassword || '';
     $('notes').value = h.notes ? `Renewal of ${h.id} — ${h.notes}` : `Renewal of ${h.id}`;
+    $('grace').value = h.grace || 0;
     if (h.expires) {
       $('expires').value = h.expires;
       setType('subscription');

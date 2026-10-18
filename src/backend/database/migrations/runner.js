@@ -43,6 +43,14 @@ const MIGRATIONS = [
             revoked      INTEGER NOT NULL DEFAULT 0
           )`,
   },
+  {
+    // Internal values not shown in Settings (e.g. the license's trusted clock copy)
+    id: '008_add_app_state',
+    sql: `CREATE TABLE IF NOT EXISTS app_state (
+            key   TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+          )`,
+  },
 ];
 
 function runMigrations(db) {

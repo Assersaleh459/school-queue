@@ -17,7 +17,7 @@ export function licenseMessage(lic) {
       return {
         tone: 'red',
         title: left === 0 ? 'License expires today' : `License expires in ${days(left)}`,
-        text: `Valid until ${fmtDate(lic.expires)}. Renew now to avoid interruption — contact Vyra Systems.`,
+        text: `Valid until ${fmtDate(lic.expires)}. ${lic.grace ? `After that, ${days(lic.grace)} of grace` : 'SchoolQ stops working the day after'} — contact Vyra Systems to renew.`,
       };
     case 'grace':
       return {

@@ -203,6 +203,7 @@ export default function Kiosk() {
               <h2 className="text-4xl font-black text-white mb-2 text-center">Select Department</h2>
               <p className="text-white/50 text-xl text-center mb-8">Which department do you need?</p>
               {error && <p className="text-red-400 text-center mb-4 text-lg">{error}</p>}
+              {departments.length === 0 && <p className="text-white/70 text-center text-xl">No departments yet. An admin adds them in Admin → Departments.</p>}
               <div className={`grid gap-4 ${departments.length > 4 ? 'grid-cols-3' : 'grid-cols-2'}`}>
                 {departments.map(d => (
                   <button

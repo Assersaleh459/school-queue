@@ -40,13 +40,15 @@ export default function LicenseExpired() {
       <form onSubmit={submit} className="w-full max-w-lg bg-white rounded-2xl shadow-lg p-8">
         <div className="flex items-center gap-3 mb-2">
           <span className="h-3 w-3 rounded-full bg-red-600" />
-          <h1 className="text-xl font-bold text-red-800">SchoolQ license has expired</h1>
+          <h1 className="text-xl font-bold text-red-800">{info?.duplicate ? 'This license is already in use' : 'SchoolQ license has expired'}</h1>
         </div>
         <p className="text-sm text-gray-600 mb-6">
-          {info?.expires
+          {info?.duplicate
+            ? `${info.reason}. One license runs one server. Close the other server, or contact Vyra Systems for a license for this PC.`
+            : info?.expires
             ? `The license${info.school ? ` for ${info.school}` : ''} ended on ${fmtDate(info.expires)}.`
             : `${info?.reason || 'The license for this server is no longer valid'}.`}
-          {' '}Contact Vyra Systems for a renewal key and enter it below.
+          {!info?.duplicate && ' Contact Vyra Systems for a renewal key and enter it below.'}
         </p>
 
         {info?.machineId && (

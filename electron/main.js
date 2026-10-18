@@ -5,6 +5,7 @@ const net    = require('net');
 const os     = require('os');
 const crypto = require('crypto');
 const license = require('./license');
+const { clockFor } = require('./trustedClock');
 const { discoverServers, testServer, findServer } = require('./discovery');
 const { createMediaControl } = require('./mediaControl');
 const { createBanner } = require('./banner');
@@ -83,11 +84,12 @@ ipcMain.on('get-local-ips',  (e)       => { e.returnValue = getLocalIPs(); });
 ipcMain.on('get-build-mode', (e)       => { e.returnValue = getBuildMode(); });
 ipcMain.on('relaunch',       ()        => { app.relaunch(); app.exit(0); });
 
-// License activation (Server build)
+// License activation (Server build). Expiry is judged on the trusted clock, not the PC date.
+const licenseClock = () => clockFor(app.getPath('userData'), license.machineId());
 ipcMain.on('license-status', (e) => {
-  e.returnValue = { ...license.checkActivated(app.getPath('userData')), machineId: license.machineId() };
+  e.returnValue = { ...license.checkActivated(app.getPath('userData'), { clock: licenseClock() }), machineId: license.machineId() };
 });
-ipcMain.handle('activate-license', (e, key) => license.activate(app.getPath('userData'), key));
+ipcMain.handle('activate-license', (e, key) => license.activate(app.getPath('userData'), key, { clock: licenseClock() }));
 // This PC as a Staff device (same Machine ID the server's license uses)
 ipcMain.on('device-info', (e) => { e.returnValue = { id: license.machineId(), name: os.hostname() }; });
 
@@ -305,7 +307,7 @@ app.on('ready', async () => {
 
   // License gate — the Server build must be activated before it runs. The Staff
   // (client) build and dev mode are exempt.
-  if (app.isPackaged && buildMode === 'server' && !license.checkActivated(app.getPath('userData')).ok) {
+  if (app.isPackaged && buildMode === 'server' && !license.checkActivated(app.getPath('userData'), { clock: licenseClock() }).ok) {
     createWindow(`file://${path.join(__dirname, 'activation.html')}`);
     return;
   }

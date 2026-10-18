@@ -19,6 +19,13 @@ export function LicenseCard({ lic, action = null }) {
   const t = TONES[m.tone];
   const urgent = lic?.status === 'critical' || lic?.status === 'grace';
   return (
+    <>
+    {lic?.clockSetBack && (
+      <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 px-5 py-3 mb-3 text-sm text-amber-900">
+        <b>The date on this PC is wrong (set back).</b> Please fix the date and time in Windows.
+        The license still counts from {new Date(lic.clockSetBack.schoolqTime).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}.
+      </div>
+    )}
     <div className={`rounded-xl border shadow-sm px-5 py-4 flex flex-wrap items-center gap-4 ${t.box}`} role={m.tone === 'red' ? 'alert' : undefined}>
       <span className="relative flex h-3 w-3 shrink-0">
         {urgent && <span className={`absolute inline-flex h-full w-full rounded-full opacity-60 animate-ping ${t.dot}`} />}
@@ -36,6 +43,7 @@ export function LicenseCard({ lic, action = null }) {
       )}
       {action}
     </div>
+    </>
   );
 }
 

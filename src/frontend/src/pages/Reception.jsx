@@ -127,6 +127,7 @@ export default function Reception() {
                 <option key={dept.department_id} value={dept.department_id}>{dept.name}</option>
               ))}
             </select>
+            {departments.length === 0 && <p className="text-sm text-amber-700 mt-2">No departments yet. An admin adds them in Admin → Departments.</p>}
           </div>
 
           {formData.department_id && (

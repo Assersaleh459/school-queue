@@ -8,6 +8,8 @@ const morgan = require('morgan');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const { startDiscoveryResponder } = require('./discovery');
+const licenseGuard = require('./licenseGuard');
+const { licenseId } = require('./license');
 
 dotenv.config();
 
@@ -148,7 +150,9 @@ server.on('listening', () => {
     port,
     school: getSetting('school_name', 'SchoolQ'),
     version: require('../../package.json').version,
+    ...licenseGuard.announce(licenseId),
   }));
+  licenseGuard.start(licenseId);
 });
 
 server.on('error', (err) => {

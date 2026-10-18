@@ -5,8 +5,9 @@
 //
 // Key = base64(JSON({ ...payload, sig })).
 //   v1 (≤1.11): { v:1, type, school, issued, expires? }   — signature covers v|type|school|issued only
-//   v2:         { v:2, id, type, school, issued, expires?, devices?, machine?, voicePass? }
-//               — signature covers every field. devices omitted = unlimited Staff devices;
+//   v2:         { v:2, id, type, school, issued, expires?, grace?, devices?, machine?, voicePass? }
+//               — signature covers every field. grace = days it keeps working after expires
+//                 (omitted = 0: stops the day after expires); devices omitted = unlimited Staff devices;
 //                 machine = the server PC's Machine ID the key is locked to;
 //                 voicePass = scrypt hash of the Vyra password that opens Voice Recordings.
 // Used by the Electron main process (activation gate), the backend (device limit, License
@@ -25,7 +26,7 @@ MCowBQYDK2VwAyEAz4ghMS505i//hZvy9iW4TJt7jXWsEun/hP2mfRioqcU=
 const DAY = 24 * 60 * 60 * 1000;
 const WARN_DAYS = 30;       // amber from here
 const CRITICAL_DAYS = 7;    // red from here
-const GRACE_DAYS = 7;       // keeps working this long after the expiry date
+const MAX_GRACE_DAYS = 60;  // grace (days after expiry) is set per key in the License Generator
 
 // The exact bytes that get signed
 function canonical(p) {
@@ -79,6 +80,7 @@ function verifyKey(keyString, publicKey = PUBLIC_KEY) {
       return { valid: false, reason: 'Malformed license key' };
     }
     if (payload.v === 2 && ((payload.expires && !DATE.test(payload.expires))
+        || (payload.grace !== undefined && !(Number.isInteger(payload.grace) && payload.grace >= 0 && payload.grace <= MAX_GRACE_DAYS))
         || (payload.devices !== undefined && !(Number.isInteger(payload.devices) && payload.devices > 0))
         || (payload.machine !== undefined && !MACHINE.test(payload.machine))
         || (payload.voicePass !== undefined && !VOICE_PASS.test(payload.voicePass)))) {
@@ -100,14 +102,16 @@ const addDays = (ymd, n) => {
 
 // Where a license stands today:
 //   ok (no expiry, or > 30 days left) · warning (≤ 30) · critical (≤ 7) ·
-//   grace (expired ≤ 7 days ago — still works) · expired (stops)
-function licenseState(payload, now = Date.now()) {
+//   grace (expired, within the key's grace days — still works) · expired (stops)
+function licenseState(payload, now) {
+  if (now == null) now = Date.now();
   const base = {
     id: payload.id || null,
     school: payload.school,
     type: payload.type,
     issued: payload.issued,
     expires: payload.expires || null,
+    grace: payload.v === 2 && payload.grace ? payload.grace : 0,
     devices: payload.v === 2 && payload.devices ? payload.devices : null,   // null = unlimited
     machineLocked: !!payload.machine,
     voiceLocked: !!payload.voicePass,
@@ -115,11 +119,11 @@ function licenseState(payload, now = Date.now()) {
   };
   if (!payload.expires) return { ...base, status: 'ok', daysLeft: null, graceUntil: null };
   const endOfDay = new Date(`${payload.expires}T23:59:59.999`).getTime();
-  const graceUntil = addDays(payload.expires, GRACE_DAYS);
+  const graceUntil = base.grace ? addDays(payload.expires, base.grace) : null;
   const daysLeft = Math.ceil((endOfDay - now) / DAY) - 1;    // 0 = expires today
   let status;
   if (now <= endOfDay) status = daysLeft <= CRITICAL_DAYS ? 'critical' : daysLeft <= WARN_DAYS ? 'warning' : 'ok';
-  else status = now <= endOfDay + GRACE_DAYS * DAY ? 'grace' : 'expired';
+  else status = graceUntil && now <= new Date(`${graceUntil}T23:59:59.999`).getTime() ? 'grace' : 'expired';
   return { ...base, status, daysLeft, graceUntil };
 }
 
@@ -144,7 +148,8 @@ function licenseFile(userDataDir) {
 
 // Activate (or renew / upgrade): verify the key, check it is for this PC and not past its
 // grace period, then store it — replacing any earlier license.
-// (opts.publicKey / opts.machine: tests only)
+// opts.clock: the trusted clock (electron/trustedClock.js) — judges expiry and is reset by a
+// newer key. Without it: opts.now or the PC clock. (opts.publicKey / opts.machine: tests only)
 function activate(userDataDir, keyString, opts = {}) {
   const thisMachine = opts.machine || machineId();
   const result = verifyKey(keyString, opts.publicKey);
@@ -153,7 +158,7 @@ function activate(userDataDir, keyString, opts = {}) {
   if (payload.machine && payload.machine !== thisMachine) {
     return { valid: false, reason: 'This license is for another PC — check the Machine ID you sent' };
   }
-  const state = licenseState(payload);
+  const state = licenseState(payload, opts.clock ? opts.clock.nowForNewKey(payload) : opts.now);
   if (state.status === 'expired') return { valid: false, reason: `License expired on ${payload.expires}` };
   const record = {
     key: String(keyString).trim(),
@@ -163,6 +168,7 @@ function activate(userDataDir, keyString, opts = {}) {
     activatedAt: new Date().toISOString(),
   };
   fs.writeFileSync(licenseFile(userDataDir), JSON.stringify(record, null, 2), 'utf8');
+  opts.clock?.acceptKey(payload);
   return { valid: true, payload, state };
 }
 
@@ -181,7 +187,7 @@ function checkActivated(userDataDir, opts = {}) {
   if (record.machineId !== thisMachine || (result.payload.machine && result.payload.machine !== thisMachine)) {
     return { ok: false, reason: 'License is activated on a different machine' };
   }
-  const state = licenseState(result.payload);
+  const state = licenseState(result.payload, opts.clock ? opts.clock.nowFor(result.payload) : opts.now);
   if (state.status === 'expired') return { ok: false, reason: `License expired on ${state.expires}`, state };
   return { ok: true, school: record.school, type: record.type, payload: result.payload, state };
 }
@@ -189,5 +195,5 @@ function checkActivated(userDataDir, opts = {}) {
 module.exports = {
   hashVoicePass, checkVoicePass,
   verifyKey, machineId, activate, checkActivated, licenseState, mintKey, canonical, matchesPublicKey,
-  PUBLIC_KEY, WARN_DAYS, CRITICAL_DAYS, GRACE_DAYS,
+  PUBLIC_KEY, WARN_DAYS, CRITICAL_DAYS, MAX_GRACE_DAYS,
 };

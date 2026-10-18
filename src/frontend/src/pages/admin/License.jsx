@@ -93,6 +93,7 @@ export default function License() {
                   <dt className="text-gray-500">Expires</dt>
                   <dd>{lic.expires ? <>{fmtDate(lic.expires)}{lic.daysLeft >= 0 && <span className="text-gray-400"> · {lic.daysLeft} days left</span>}</> : 'Never'}</dd>
                 </div>
+                {lic.expires && <div><dt className="text-gray-500">Grace after expiry</dt><dd>{lic.grace ? `${lic.grace} day${lic.grace === 1 ? '' : 's'}` : 'None'}</dd></div>}
                 <div><dt className="text-gray-500">Staff devices</dt><dd>{allowed ? `${allowed} at once` : 'Unlimited'}</dd></div>
                 <div><dt className="text-gray-500">Voice Recordings</dt><dd>{lic.voiceLocked ? 'Locked by Vyra Systems' : 'Open'}</dd></div>
               </dl>

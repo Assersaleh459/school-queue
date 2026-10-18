@@ -46,17 +46,32 @@ test('v1 keys from earlier versions still work (perpetual, unlimited devices)', 
   expect(licenseState(verifyKey(key, PUB).payload)).toMatchObject({ status: 'ok', devices: null, machineLocked: false, version: 1 });
 });
 
-test('expiry: ok → warning (30 d) → critical (7 d) → grace (7 d after) → expired', () => {
+test('expiry: ok → warning (30 d) → critical (7 d) → expired the next day (no grace by default)', () => {
   const at = (days) => licenseState(v2({ type: 'subscription', expires: ymd(days) }));
   expect(at(35)).toMatchObject({ status: 'ok', daysLeft: 35 });
   expect(at(30)).toMatchObject({ status: 'warning', daysLeft: 30 });
   expect(at(8)).toMatchObject({ status: 'warning' });
   expect(at(7)).toMatchObject({ status: 'critical', daysLeft: 7 });
   expect(at(0)).toMatchObject({ status: 'critical', daysLeft: 0 });     // last day
-  expect(at(-3)).toMatchObject({ status: 'grace', graceUntil: ymd(4) });
-  expect(at(-7)).toMatchObject({ status: 'grace' });
-  expect(at(-8)).toMatchObject({ status: 'expired' });
+  expect(at(-1)).toMatchObject({ status: 'expired', grace: 0, graceUntil: null });
   expect(licenseState(v2())).toMatchObject({ status: 'ok', daysLeft: null, expires: null, devices: 5, machineLocked: true });
+});
+
+test('grace days come from the signed key', () => {
+  const at = (days, grace) => licenseState(v2({ type: 'subscription', expires: ymd(days), grace }));
+  expect(at(-3, 5)).toMatchObject({ status: 'grace', grace: 5, graceUntil: ymd(2) });
+  expect(at(-5, 5)).toMatchObject({ status: 'grace' });                 // last grace day
+  expect(at(-6, 5)).toMatchObject({ status: 'expired' });
+  expect(at(-1, 0)).toMatchObject({ status: 'expired' });
+  // v1 keys and keys without grace get none
+  expect(licenseState({ v: 1, type: 'subscription', school: 'X', issued: '2026-01-01', expires: ymd(-1) }).status).toBe('expired');
+  // grace is signed and range-checked
+  const key = mintKey(v2({ type: 'subscription', expires: ymd(30), grace: 3 }), PRIV);
+  expect(verifyKey(key, PUB).valid).toBe(true);
+  expect(verifyKey(tamper(key, o => { o.grace = 30; }), PUB).valid).toBe(false);
+  expect(verifyKey(tamper(key, o => { delete o.grace; }), PUB).valid).toBe(false);
+  expect(verifyKey(mintKey(v2({ grace: 61 }), PRIV), PUB).reason).toBe('Malformed license key');
+  expect(verifyKey(mintKey(v2({ grace: 1.5 }), PRIV), PUB).reason).toBe('Malformed license key');
 });
 
 describe('activation', () => {
@@ -72,13 +87,14 @@ describe('activation', () => {
     expect(checkActivated(dir, { publicKey: PUB, machine: 'c'.repeat(32) }).ok).toBe(false);   // license.json copied to another PC
   });
 
-  test('a renewal replaces the license; an expired key is refused; grace still runs', () => {
+  test('a renewal replaces the license; an expired key is refused; grace from the key still runs', () => {
     activate(dir, mintKey(v2({ type: 'subscription', expires: ymd(5) }), PRIV), opts);
     expect(checkActivated(dir, opts).state.status).toBe('critical');
     expect(activate(dir, mintKey(v2({ type: 'subscription', expires: ymd(-10) }), PRIV), opts)).toMatchObject({ valid: false, reason: /expired/ });
     activate(dir, mintKey(v2({ type: 'subscription', expires: ymd(365), devices: 8 }), PRIV), opts);
     expect(checkActivated(dir, opts)).toMatchObject({ ok: true, state: { status: 'ok', devices: 8 } });
-    activate(dir, mintKey(v2({ type: 'subscription', expires: ymd(-2) }), PRIV), opts);
+    expect(activate(dir, mintKey(v2({ type: 'subscription', expires: ymd(-2) }), PRIV), opts)).toMatchObject({ valid: false, reason: /expired/ });
+    activate(dir, mintKey(v2({ type: 'subscription', expires: ymd(-2), grace: 7 }), PRIV), opts);
     expect(checkActivated(dir, opts)).toMatchObject({ ok: true, state: { status: 'grace' } });
   });
 

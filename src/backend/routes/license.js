@@ -13,7 +13,7 @@ router.get('/status', authMiddleware, (req, res) => {
   const cur = lic.current();
   if (!cur) return res.json({ licensed: false });
   const s = cur.state || {};
-  res.json({ licensed: true, status: s.status, daysLeft: s.daysLeft, expires: s.expires, graceUntil: s.graceUntil, school: s.school });
+  res.json({ licensed: true, status: s.status, daysLeft: s.daysLeft, expires: s.expires, grace: s.grace, graceUntil: s.graceUntil, school: s.school });
 });
 
 // Admin → License and the Overview card
@@ -23,6 +23,7 @@ router.get('/', admin, (req, res) => {
     licensed: !!cur,
     blocked: !!cur?.blocked,
     reason: cur?.reason || null,
+    clockSetBack: cur?.clockSetBack || null,
     ...(cur?.state || {}),
     devicesUsed: devices.activeCount(),
     activeMinutes: devices.ACTIVE_MINUTES,
@@ -44,7 +45,7 @@ router.post('/devices/:id/revoke', admin, (req, res) => {
 router.get('/expired', (req, res) => {
   const cur = lic.current();
   if (!cur?.blocked) return res.json({ blocked: false });
-  res.json({ blocked: true, reason: cur.reason, school: cur.state?.school || null, expires: cur.state?.expires || null, machineId: lic.machineId() });
+  res.json({ blocked: true, duplicate: !!cur.duplicate, reason: cur.reason, school: cur.state?.school || null, expires: cur.duplicate ? null : cur.state?.expires || null, machineId: lic.machineId() });
 });
 
 // Renew / upgrade with a new key: super admin — or anyone while the license has run out,

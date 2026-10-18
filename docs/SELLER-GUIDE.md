@@ -27,7 +27,7 @@ How to issue licenses and sell SchoolQ to multiple schools. **Internal — do no
 
 ## Issuing a license: the License Generator app
 
-Build it once with `npm run dist:generator`, then install `dist-generator\SchoolQ License Generator Setup 1.1.0.exe` **on your own PC only**.
+Build it once with `npm run dist:generator`, then install `dist-generator\SchoolQ License Generator Setup 1.2.0.exe` **on your own PC only**.
 
 1. **First run:** select `license-private.pem`. The app remembers where the file is, but it never copies the key, so the app is harmless if someone else gets it. If the key is on a USB stick, plug the stick in when you make licenses.
 2. **Ask the school for its Machine ID.** It is shown on the activation screen of SchoolQ Server (with a Copy button) and under Admin → License.
@@ -36,6 +36,7 @@ Build it once with `npm run dist:generator`, then install `dist-generator\School
    - Machine ID
    - Staff devices (or Unlimited)
    - Perpetual, or Subscription with an expiry date (+1 month / +6 months / +1 year buttons)
+   - for a subscription: **grace period after expiry** in days (0–60, default 0 = stops the day after the expiry date)
    - notes, such as the invoice number
 4. **Generate**, then **Copy key** or **Save as .txt** and send it to the school.
 
@@ -79,8 +80,11 @@ node tools/generate-license.js "Green Valley School" --machine <MachineID> --dev
 | More than 30 days left | Quiet "Valid until …" on Admin → Overview |
 | 30 days or less | **Amber** card on Admin → Overview: "License expires in N days" |
 | 7 days or less | **Red** pulsing card |
-| Expired, first 7 days (grace) | Everything still works. A **red bar on every staff screen**: "SchoolQ will stop working on …". The TV display and kiosk stay clean. |
-| After the grace period | SchoolQ stops: every screen shows **"SchoolQ license has expired"** with the Machine ID and a box for a new key. No login is needed to enter it. |
+| Expiry day | Still works until the end of that day |
+| Grace days (only if you set them in the key) | Everything still works. A **red bar on every staff screen**: "SchoolQ will stop working on …". The TV display and kiosk stay clean. |
+| After that (the next day when grace is 0) | SchoolQ stops: every screen shows **"SchoolQ license has expired"** with the Machine ID and a box for a new key. No login is needed to enter it. Nothing is deleted: a new key brings everything back at once. |
+
+Keys made before 1.14.0 have no grace field, so they get **0 days**.
 
 ---
 
@@ -135,7 +139,7 @@ Tick each step before you leave the school.
 - [ ] Send yourself the **Machine ID** from the activation screen. Make the key in the License Generator (seats, expiry, Voice Recordings password). Paste it and press **Activate**.
 - [ ] Sign in as `admin` / `admin123`, then **change the password at once** with the **🔑 Password** button on the home screen. Give the new password only to the school's admin.
 - [ ] **Admin → Settings:** set the school name (new installs start as "My School"), colours, logo and working hours.
-- [ ] **Admin → Departments:** replace the 3 example departments (Administration, Accounting, Student Relations) and their services with the school's own.
+- [ ] **Admin → Departments:** add the school's departments and their services. A new install starts with none (only the `admin` user).
 - [ ] **Admin → Users:** make one account per staff member, with only the pages they need. Don't share the admin account.
 - [ ] **Voice Recordings → Backup & move:** **Import engine**, then **Import voices**. Choose the voices for calls and announcements, then test a call.
 
@@ -148,6 +152,21 @@ Tick each step before you leave the school.
 - [ ] Clear your test tickets with **Admin → Settings → Reset Tickets** (this deletes **all** tickets, so do it only before the school starts using SchoolQ).
 - [ ] Write down for the school: the server PC name, where SchoolQ is installed, and how to reach you. Write the admin password only on the school's own copy.
 - [ ] Record the license in the generator's History (notes: invoice number, handover date).
+
+---
+
+## How the license is protected (1.14.0+)
+
+| Trick | What happens |
+|---|---|
+| Edit the key (later date, more devices, more grace) | Refused: "Invalid license signature" |
+| Copy the license to another PC | Refused: "This license is for another PC" |
+| **Set the Windows date back** | No effect. SchoolQ keeps its own date (the **trusted clock**), which only moves forward and also counts real running time. Admins see "The date on this PC is wrong (set back)", and the Audit Log gets a **CLOCK_SET_BACK** entry. |
+| Delete SchoolQ's saved date | It is kept in 3 sealed copies: `clock.dat` in the data folder, the Windows registry (`HKCU\Software\SchoolQ`), and the database. The newest ticket's time and the key's issue date also count. |
+| **Clone the server PC's disk** to run a second server on one license | If both run on the same network, the one that started later stops: "This license is already in use by another SchoolQ Server on this network". The other keeps working. Checked every 2 minutes, so the block ends by itself once only one runs. |
+| Edit SchoolQ's program files | The installed app refuses to start (Electron fuses + file-integrity check). |
+
+**If a school's PC date was once set far into the future by mistake**, the license can look expired too early. Fix: make them **any new key** (Renew in History) and send it. A key issued later than the one they have resets SchoolQ's date to that key's issue day. Re-pasting their old key does not.
 
 ---
 

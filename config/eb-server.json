@@ -6,7 +6,7 @@
     "buildResources": "electron"
   },
   "extraMetadata": {
-    "version": "1.13.2"
+    "version": "1.15.1"
   },
   "extraResources": [
     {
@@ -24,6 +24,13 @@
   "asarUnpack": [
     "src/backend/voice-engine/**"
   ],
+  "electronFuses": {
+    "runAsNode": false,
+    "enableNodeOptionsEnvironmentVariable": false,
+    "enableNodeCliInspectArguments": false,
+    "enableEmbeddedAsarIntegrityValidation": true,
+    "onlyLoadAppFromAsar": true
+  },
   "win": {
     "target": ["nsis"],
     "forceCodeSigning": false,

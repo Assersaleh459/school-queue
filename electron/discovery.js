@@ -53,6 +53,7 @@ function discoverServers({ timeoutMs = 1500, discoveryPort = DISCOVERY_PORT } = 
         if (r.app !== 'SchoolQ' || !r.port) return;
         found.set(`${rinfo.address}:${r.port}`, {
           ip: rinfo.address, port: r.port, school: r.school || '', version: r.version || '',
+          lic: r.lic, inst: r.inst, up: r.up,   // for the server's clone guard (src/backend/licenseGuard.js)
         });
       } catch {}
     });
