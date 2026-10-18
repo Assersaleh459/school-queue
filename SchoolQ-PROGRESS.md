@@ -1,6 +1,6 @@
 # SchoolQ: progress
 
-Last updated: 2026-10-18. Current version **1.15.1** (1.14.0–1.15.1 not committed yet). License Generator **1.2.0**.
+Last updated: 2026-10-18. Current version **1.15.1**, pushed to GitHub `main` (commits `04771e2`, `3938a8e`, `7dd0a99`). License Generator **1.2.0**.
 
 ## Done (recent)
 | Version | What |
@@ -23,7 +23,7 @@ Tests at 1.15.1: 90 backend under Node + 11 under Electron (`devices.test.js`, `
 Tests at 1.14.0: 95 backend (run `devices.test.js` under Electron, see SchoolQ-CLAUDE.md) + 8 frontend + generator harness 10/10. Live-tested on test servers: set-back clock blocks an expired license and writes the audit entry; clone guard blocks the second server and unblocks ~2 min after the first stops; the built 1.14.0 Server app runs with fuses, and a copy with one changed byte refuses to start.
 
 ## In progress
-- 1.15.1 is built (`dist\SchoolQ Server/Staff Setup 1.15.1.exe`, `dist-generator\SchoolQ License Generator Setup 1.2.0.exe`) but 1.14.0–1.15.1 are **not committed**. 1.13.2 is committed (`a22632a`) but not pushed.
+- 1.15.1 is built (`dist\SchoolQ Server/Staff Setup 1.15.1.exe`, `dist-generator\SchoolQ License Generator Setup 1.2.0.exe`) Everything is committed and pushed.
 
 ## Next
 - **User:** install License Generator 1.2.0 over the old one (history is kept).
