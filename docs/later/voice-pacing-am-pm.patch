@@ -1,0 +1,36 @@
+diff --git a/src/backend/voice-engine/voicegen.py b/src/backend/voice-engine/voicegen.py
+index ff0c3cf..814f9fd 100644
+--- a/src/backend/voice-engine/voicegen.py
++++ b/src/backend/voice-engine/voicegen.py
+@@ -133,10 +133,30 @@ def speakable(text, lang):
+     return re.sub(r"\s+", " ", t).strip(" ,،")
+ 
+ 
++# ── Pace. OmniVoice plans a clip's length from its letters (one letter ≈ one sound), so words read
++# letter by letter (AM, PM, SMS, ID) get too little time and the whole clip sounds rushed. Give
++# each spelled letter the time of SPELLED_LETTER ordinary letters; other texts keep their speed.
++SPELLED = re.compile(r"\b[A-Z]{2,4}\b")
++SPELLED_LETTER = 2.5
++
++
++def pace_speed(tts, text):
++    """`speed` for the model (1.0 = as planned, < 1.0 = slower). 1.0 if it can't be worked out."""
++    spelled = sum(len(w) for w in SPELLED.findall(text))
++    if not spelled:
++        return 1.0
++    try:
++        weight = tts.model.duration_estimator.calculate_total_weight(tts.normalizer.normalize(text))
++    except Exception:
++        return 1.0
++    return weight / (weight + spelled * (SPELLED_LETTER - 1)) if weight > 0 else 1.0
++
++
+ def synthesize_clip(tts, text, lang, speaker, out_path):
+     """Generate one clip and write it as OGG Vorbis. Returns the clip length in seconds, or None if silent."""
+     text = speakable(text, lang)
+-    wav = clean(tts.synthesize(text, speaker=speaker, language="arz" if lang == "ar" else "en"), tts.sampling_rate)
++    wav = clean(tts.synthesize(text, speaker=speaker, language="arz" if lang == "ar" else "en",
++                               speed=pace_speed(tts, text)), tts.sampling_rate)
+     if wav is None:
+         return None
+     sf.write(out_path, wav, tts.sampling_rate, format="OGG", subtype="VORBIS")

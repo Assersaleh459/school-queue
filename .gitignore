@@ -36,3 +36,8 @@ key-backup/
 
 # Python bytecode (voice tools)
 __pycache__/
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/

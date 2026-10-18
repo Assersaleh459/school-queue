@@ -89,8 +89,53 @@ def load_engine(model_dir, device=None):
     return VoiceTutTTS.from_pretrained(model_dir, device=device, dtype=dtype), device
 
 
+# ── Text the model can say. VoiceTut's normalizer always reads digits as Egyptian Arabic words
+# (also in English text) and passes symbols like "|" through to the model, which can't say them.
+PAUSE_SYMBOLS = re.compile(r"\s*[|/\\*_~^<>\[\]{}=•·]+\s*")
+RANGE_DASH = re.compile(r"(\d(?:\s*(?:[AaPp]\.?[Mm]\.?))?)\s*[-–—]\s*(?=\d)")
+SPACED_DASH = re.compile(r"\s+[-–—]+\s+")
+
+
+def en_number(n):
+    """0..999999 in English words; longer numbers digit by digit."""
+    if n < 100:
+        return en_words(n) if n else "zero"
+    if n < 1000:
+        return f"{ONES[n // 100]} hundred" + (f" {en_words(n % 100)}" if n % 100 else "")
+    if n < 1000000:
+        return f"{en_number(n // 1000)} thousand" + (f" {en_number(n % 1000)}" if n % 1000 else "")
+    return " ".join(en_number(int(d)) for d in str(n))
+
+
+def en_numbers(text):
+    """Digits in English text → English words (times, percents, decimals, long numbers)."""
+    def time(m):
+        h, mm = int(m.group(1)), int(m.group(2))
+        return en_number(h) + ("" if mm == 0 else f" oh {en_number(mm)}" if mm < 10 else f" {en_number(mm)}")
+    text = re.sub(r"\b(\d{1,2}):(\d{2})\b", time, text)
+    text = re.sub(r"(\d+)\s*%", lambda m: f"{m.group(1)} percent", text)
+    text = re.sub(r"\b(\d+)\.(\d+)\b", lambda m: f"{m.group(1)} point " + " ".join(en_number(int(d)) for d in m.group(2)), text)
+    text = re.sub(r"\d{7,}", lambda m: " ".join(en_number(int(d)) for d in m.group(0)), text)
+    text = re.sub(r"#\s*(?=\d)", "number ", text)
+    text = text.replace("&", " and ")
+    return re.sub(r"\d+", lambda m: en_number(int(m.group(0))), text)
+
+
+def speakable(text, lang):
+    """What the model is given for `text` (the clip is still saved under the original text)."""
+    t = RANGE_DASH.sub(lambda m: m.group(1) + (" إلى " if lang == "ar" else " to "), text or "")
+    pause = "، " if lang == "ar" else ", "
+    t = SPACED_DASH.sub(pause, t)
+    t = PAUSE_SYMBOLS.sub(pause, t)
+    if lang == "en":
+        t = en_numbers(t)
+    t = re.sub(r"\s*([,،])(\s*[,،])+", r"\1", t)          # no double pauses
+    return re.sub(r"\s+", " ", t).strip(" ,،")
+
+
 def synthesize_clip(tts, text, lang, speaker, out_path):
     """Generate one clip and write it as OGG Vorbis. Returns the clip length in seconds, or None if silent."""
+    text = speakable(text, lang)
     wav = clean(tts.synthesize(text, speaker=speaker, language="arz" if lang == "ar" else "en"), tts.sampling_rate)
     if wav is None:
         return None
