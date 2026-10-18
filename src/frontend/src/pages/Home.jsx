@@ -191,7 +191,7 @@ function ChangePasswordModal({ onClose }) {
     e.preventDefault();
     setError('');
     if (next !== confirm) { setError('New passwords do not match.'); return; }
-    if (next.length < 6)  { setError('New password must be at least 6 characters.'); return; }
+    if (next.length < 8)  { setError('New password must be at least 8 characters.'); return; }
 
     setSaving(true);
     try {
@@ -238,7 +238,7 @@ function ChangePasswordModal({ onClose }) {
                 onChange={e => setNext(e.target.value)}
                 className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal"
                 required
-                minLength={6}
+                minLength={8}
               />
             </div>
             <div>

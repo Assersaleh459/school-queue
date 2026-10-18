@@ -1,6 +1,6 @@
 # SchoolQ: progress
 
-Last updated: 2026-10-18. Current version **1.15.1**, pushed to GitHub `main` (commits `04771e2`, `3938a8e`, `7dd0a99`). License Generator **1.2.0**.
+Last updated: 2026-10-19. Current version **1.15.2** (not committed yet). 1.15.1 is pushed to GitHub `main`. License Generator **1.2.0**.
 
 ## Done (recent)
 | Version | What |
@@ -16,25 +16,26 @@ Last updated: 2026-10-18. Current version **1.15.1**, pushed to GitHub `main` (c
 
 | 1.15.0 | **Voices export carries the school setup**: call wording, departments + services, announcements, voice choices (`src/backend/schoolSetup.js`, in `pack.json`). Import shows tick boxes and only adds (departments matched by EN/AR name; taken codes get a number; services by name; announcements by text). Kiosk/Reception "No departments yet" hints |
 | 1.15.1 | **Voice text cleanup** (`speakable()` in `voicegen.py`): symbols like `|` / `*` become a pause, "8 - 3" becomes "8 to 3" / "إلى", English digits become English words (VoiceTut's normalizer read all digits as Arabic). Existing clips recorded before this must be redone |
+| 1.15.2 | **Default password must be changed.** Signing in with `admin123` marks the login token; the server then refuses every request except "who am I" and "change password" (403 `must_change_password`), and the app shows a "Choose a new password" screen that can't be skipped. `admin123` can't be chosen as the new password. Changing it returns a fresh normal token. Kiosk and display screens don't sign in, so they aren't affected. The Home → 🔑 Password window now asks for 8+ characters, the same as the server (it allowed 6) |
 | tooling | Playwright 1.64.1 (`@playwright/test` dev dependency), browsers in `E:\ms-playwright` (user env `PLAYWRIGHT_BROWSERS_PATH`, 718 MB) |
 
 Tests at 1.15.1: 90 backend under Node + 11 under Electron (`devices.test.js`, `schoolSetup.test.js`) + 8 frontend; voices export→import e2e with Playwright 17/17 (scratch script); `speakable()` 10/10.
 
 Tests at 1.14.0: 95 backend (run `devices.test.js` under Electron, see SchoolQ-CLAUDE.md) + 8 frontend + generator harness 10/10. Live-tested on test servers: set-back clock blocks an expired license and writes the audit entry; clone guard blocks the second server and unblocks ~2 min after the first stops; the built 1.14.0 Server app runs with fuses, and a copy with one changed byte refuses to start.
 
+Tests at 1.15.2: 95 backend under Node (5 new for the password rule) + 11 under Electron + 8 frontend; browser test on a fresh test server 8/8 (forced screen, 403 until changed, survives reload, `admin123` refused, home opens after, new token works, old password rejected).
+
 ## In progress
-- 1.15.1 is built (`dist\SchoolQ Server/Staff Setup 1.15.1.exe`, `dist-generator\SchoolQ License Generator Setup 1.2.0.exe`) Everything is committed and pushed.
+- 1.15.2 code is done and tested but **not committed or built** yet. 1.15.1 installers are in `dist\`; `dist-generator\SchoolQ License Generator Setup 1.2.0.exe`.
 
 ## Next
 - **User:** install License Generator 1.2.0 over the old one (history is kept).
-- **User:** decide when to update Farabi's live server to 1.14.0 (its license is perpetual v1, so expiry/grace don't affect it).
+- **User:** decide when to update Farabi's live server (its license is perpetual v1, so expiry/grace don't affect it). From 1.15.2, anyone there still signing in with `admin123` will be asked for a new password on their next sign-in, so tell the school first.
 - **Later version: AM/PM pacing**, saved in `docs/later/voice-pacing-am-pm.patch` (not in the code or the 1.15.1 installers). Words read letter by letter (AM, PM, SMS, ID) get more speaking time so the clip isn't rushed; other texts keep their speed. Tested by ear: "School hours: 8 AM - 3 PM…" 2.8 s → 3.5 s, user approved; keep `SPELLED_LETTER = 2.5`. Apply with `git apply docs/later/voice-pacing-am-pm.patch`, then bump the version.
 - **User:** after updating, re-record the announcements and phrases that contain numbers or symbols (Voice Recordings → Listen & fix → redo), since old clips were made with the old text handling.
 - Not verified by ear: the 1.15.1 voice text fix (text checked 10/10; a test clip couldn't be made: the 4 GB GPU ran out of memory twice).
 - Not run-tested yet: the installed Staff 1.14.0 app and the installed Generator 1.2.0 (both built fine; the generator's code was tested from source).
 
 ## Known issues / reminders
-- **Live admin account still uses the default password.** Change it before handing to a school.
-- **New installs still use `admin` / `admin123`.** Nothing forces a change; the handover checklist says to change it at once.
-- **Two untracked files the user didn't ask to commit:** `2026-10-15-170512-this-session-...txt` (a saved transcript) and `docs/SELLER-GUIDETXT.txt` (an old copy). Keep or delete them.
+- **Live admin account still uses the default password.** Change it before handing to a school (1.15.2+ forces it on the next sign-in).- **Two untracked files the user didn't ask to commit:** `2026-10-15-170512-this-session-...txt` (a saved transcript) and `docs/SELLER-GUIDETXT.txt` (an old copy). Keep or delete them.
 - **Version bump:** after every change, bump all 4 version files (see SchoolQ-CLAUDE.md).

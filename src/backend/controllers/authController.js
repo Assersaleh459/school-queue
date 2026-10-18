@@ -4,6 +4,14 @@ const db = require('../database/db');
 const { log } = require('../audit');
 const devices = require('../devices');
 
+// The password every new install starts with (see db.js). It is publicly known, so anyone
+// who signs in with it must choose a new one before they can use anything else.
+const DEFAULT_PASSWORD = 'admin123';
+
+function signToken(claims) {
+  return jwt.sign(claims, process.env.JWT_SECRET, { expiresIn: '8h' });
+}
+
 exports.login = async (req, res) => {
   const { username, password } = req.body;
 
@@ -32,17 +40,15 @@ exports.login = async (req, res) => {
     db.prepare("UPDATE users SET last_login = datetime('now') WHERE user_id = ?").run(user.user_id);
     log(user.user_id, 'LOGIN', 'user', user.user_id, { username: user.username });
 
-    const token = jwt.sign(
-      {
-        user_id: user.user_id,
-        username: user.username,
-        role: user.role,
-        department_id: user.department_id,
-        device_id: device.id
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: '8h' }
-    );
+    const mustChange = password === DEFAULT_PASSWORD;
+    const token = signToken({
+      user_id: user.user_id,
+      username: user.username,
+      role: user.role,
+      department_id: user.department_id,
+      device_id: device.id,
+      ...(mustChange && { must_change_password: true })
+    });
 
     res.json({
       token,
@@ -52,7 +58,8 @@ exports.login = async (req, res) => {
         full_name: user.full_name,
         role: user.role,
         department_id: user.department_id,
-        allowed_pages: user.allowed_pages ? JSON.parse(user.allowed_pages) : null
+        allowed_pages: user.allowed_pages ? JSON.parse(user.allowed_pages) : null,
+        must_change_password: mustChange
       }
     });
   } catch (error) {
@@ -67,7 +74,8 @@ exports.me = (req, res) => {
   ).get(req.user.user_id);
   res.json({
     ...user,
-    allowed_pages: user.allowed_pages ? JSON.parse(user.allowed_pages) : null
+    allowed_pages: user.allowed_pages ? JSON.parse(user.allowed_pages) : null,
+    must_change_password: !!req.user.must_change_password
   });
 };
 
@@ -80,6 +88,9 @@ exports.changePassword = async (req, res) => {
   if (new_password.length < 8) {
     return res.status(400).json({ error: 'New password must be at least 8 characters' });
   }
+  if (new_password === DEFAULT_PASSWORD) {
+    return res.status(400).json({ error: 'Choose a password other than the default one' });
+  }
 
   try {
     const user = db.prepare('SELECT * FROM users WHERE user_id = ?').get(req.user.user_id);
@@ -91,7 +102,9 @@ exports.changePassword = async (req, res) => {
     const hash = await bcrypt.hash(new_password, 10);
     db.prepare('UPDATE users SET password_hash = ? WHERE user_id = ?').run(hash, user.user_id);
     log(user.user_id, 'CHANGE_PASSWORD', 'user', user.user_id);
-    res.json({ success: true });
+    // A fresh token without the "must change password" mark, so the user can carry on
+    const { iat, exp, must_change_password, ...claims } = req.user;
+    res.json({ success: true, token: signToken(claims) });
   } catch {
     res.status(500).json({ error: 'Failed to change password' });
   }

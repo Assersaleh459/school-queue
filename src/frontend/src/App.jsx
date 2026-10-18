@@ -6,6 +6,7 @@ import './lib/voiceLock';       // unlock token on voice requests
 import useAuthStore from './store/useAuthStore';
 import Toast from './components/Toast';
 import { LicenseBanner } from './components/LicenseNotice';
+import ForcePasswordChange from './components/ForcePasswordChange';
 
 // ── Lazy-loaded routes ────────────────────────────────────────────────────────
 const Login        = lazy(() => import('./pages/Login'));
@@ -54,6 +55,8 @@ function ProtectedRoute({ children, roles = [], page = null, denyDeptStaff = fal
   const { isAuthenticated, user } = useAuthStore();
 
   if (!isAuthenticated()) return <Navigate to="/login" />;
+
+  if (user?.must_change_password) return <ForcePasswordChange />;
 
   if (page && user?.allowed_pages) {
     if (!user.allowed_pages.includes(page)) return <Navigate to="/home" />;

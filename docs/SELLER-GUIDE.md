@@ -137,7 +137,7 @@ Tick each step before you leave the school.
 **On the server PC**
 - [ ] Install SchoolQ Server and choose **Server** on the first-time setup screen.
 - [ ] Send yourself the **Machine ID** from the activation screen. Make the key in the License Generator (seats, expiry, Voice Recordings password). Paste it and press **Activate**.
-- [ ] Sign in as `admin` / `admin123`, then **change the password at once** with the **🔑 Password** button on the home screen. Give the new password only to the school's admin.
+- [ ] Sign in as `admin` / `admin123`. The app asks for a new password at once (1.15.2+) and nothing else works until it is changed. Give the new password only to the school's admin.
 - [ ] **Admin → Settings:** set the school name (new installs start as "My School"), colours, logo and working hours.
 - [ ] **Admin → Departments:** add the school's departments and their services. A new install starts with none (only the `admin` user).
 - [ ] **Admin → Users:** make one account per staff member, with only the pages they need. Don't share the admin account.

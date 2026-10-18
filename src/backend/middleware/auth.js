@@ -2,6 +2,8 @@ const jwt = require('jsonwebtoken');
 const db = require('../database/db');
 const devices = require('../devices');
 
+const PASSWORD_CHANGE_PATHS = ['/api/auth/me', '/api/auth/change-password'];
+
 function authMiddleware(req, res, next) {
   const token = req.headers.authorization?.replace('Bearer ', '');
 
@@ -20,6 +22,10 @@ function authMiddleware(req, res, next) {
         return res.status(401).json({ error: 'This device was signed out by the admin' });
       }
       devices.touch(decoded.device_id);
+    }
+    // Signed in with the default password: only "who am I" and "change password" work until it is changed
+    if (decoded.must_change_password && !PASSWORD_CHANGE_PATHS.includes(req.originalUrl.split('?')[0])) {
+      return res.status(403).json({ error: 'Change the default password first', code: 'must_change_password' });
     }
     req.user = decoded;
     next();
