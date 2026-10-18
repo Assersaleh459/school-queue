@@ -1,7 +1,15 @@
 // Run: cd src/frontend && npm test   (Node's built-in test runner — no extra deps)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { clipKey, splitTemplate, numberClips, buildPlan, missingClips, requiredPieces, announcementTexts } from './voiceClips.js';
+import { clipKey, splitTemplate, numberClips, buildPlan, missingClips, requiredPieces, announcementTexts, unrecordedTexts } from './voiceClips.js';
+
+test('unrecordedTexts lists the languages of an announcement with no recording', () => {
+  const a = { message_text: 'School closes early.', message_text_ar: 'المدرسة تغلق مبكرا', speak_language: 'both' };
+  assert.deepEqual(unrecordedTexts(a, {}), [{ lang: 'en', text: 'School closes early.' }, { lang: 'ar', text: 'المدرسة تغلق مبكرا' }]);
+  assert.deepEqual(unrecordedTexts(a, { en: { 'School closes early': 'en-1.ogg' } }), [{ lang: 'ar', text: 'المدرسة تغلق مبكرا' }]);
+  assert.deepEqual(unrecordedTexts(a, { en: { 'School closes early': 'x' }, ar: { 'المدرسة تغلق مبكرا': 'y' } }), []);
+  assert.deepEqual(unrecordedTexts({ message_text: 'Hi' }, undefined), [{ lang: 'en', text: 'Hi' }]);
+});
 
 test('clipKey collapses spaces and drops edge punctuation only', () => {
   assert.equal(clipKey('  ، القسم  '), 'القسم');

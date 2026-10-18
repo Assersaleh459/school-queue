@@ -114,7 +114,7 @@ export const voiceAPI = {
   generate:   (items, force = false, voice) => api.post('/voice/generate', { items, force, voice }),
   pause:      ()                    => api.post('/voice/engine/pause'),
   resume:     ()                    => api.post('/voice/engine/resume'),
-  remove:     (lang, text, voice)   => api.post('/voice/remove', { lang, text, voice }),
+  remove:     (lang, text, voice, everywhere = false) => api.post('/voice/remove', { lang, text, voice, everywhere }),
   install:    ()                    => api.post('/voice/engine/install'),
   announce:   (id)                  => api.post(`/voice/announce/${id}`),
   voices:     ()                    => api.get('/voice/voices'),
@@ -125,6 +125,7 @@ export const voiceAPI = {
   keepTakes:  (voice, items, keep)  => api.post('/voice/takes', { voice, items, keep }),
   flag:       (voice, items, flagged) => api.post('/voice/flags', { voice, items, flagged }),
   restore:    (voice, { lang, kind, n }) => api.post(`/voice/voices/${voice}/restore`, { lang, kind, n }),
+  wipe:       (password)            => api.post('/voice/wipe', { password, confirm: 'WIPE' }),
 };
 
 export default api;

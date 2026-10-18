@@ -53,7 +53,8 @@ function VoiceRecordings() {
   const [phraseLang, setPhraseLang] = useState('ar');
   const [voices, setVoices]       = useState([]);
   const [takes, setTakes]         = useState({});   // "<voice>|<clip id>" → clip, for new takes waiting
-  const [takesSeen, setTakesSeen] = useState(0);    // bumps on reload, so a take is fetched afresh
+  const [takesSeen, setTakesSeen] = useState(0);
+  const [deleted, setDeleted]     = useState(0);    // bumps when a phrase is deleted, so Listen & fix reloads    // bumps on reload, so a take is fetched afresh
   const lastDone = useRef(-1);
   const player = useRef(null);
 
@@ -147,6 +148,20 @@ function VoiceRecordings() {
     try {
       await voiceAPI.remove(p.lang, p.text, voiceOf(p));
       setManifest((await voiceAPI.manifest()).data || {});
+      setDeleted(n => n + 1);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Delete failed');
+    }
+  };
+
+  // A phrase typed by mistake: gone from every voice, not only this one's recording
+  const removeEverywhere = async (p) => {
+    if (!confirm(`Remove this phrase from every voice?\n\n"${p.text}"`)) return;
+    try {
+      await voiceAPI.remove(p.lang, p.text, undefined, true);
+      setManifest((await voiceAPI.manifest()).data || {});
+      setDeleted(n => n + 1);
+      loadEngine();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Delete failed');
     }
@@ -408,6 +423,9 @@ function VoiceRecordings() {
                           <button onClick={() => generate([p])} disabled={!installed} className="px-2 py-1 text-xs bg-teal text-white rounded disabled:opacity-40">Record</button>
                         </span>
                       )}
+                    {p.source === 'custom' && (
+                      <button onClick={() => removeEverywhere(p)} title="Delete phrase (from every voice)" className="px-2 py-1 text-sm rounded hover:bg-gray-100">❌</button>
+                    )}
                   </li>
                 );
               })}
@@ -417,7 +435,8 @@ function VoiceRecordings() {
       })}
 
       {voices.length > 0 && (
-        <VoiceBrowser key={callsVoice} voices={voices} defaultVoice={callsVoice} installed={installed} engine={engine} onChanged={loadEngine} />
+        <VoiceBrowser key={callsVoice} voices={voices} defaultVoice={callsVoice} installed={installed} engine={engine} refresh={deleted}
+          onChanged={() => { loadEngine(); voiceAPI.manifest().then(m => setManifest(m.data || {})).catch(() => {}); }} />
       )}
 
       <VoicePack voices={voices} installed={installed} onImported={() => { loadVoices(); loadPieces(); loadEngine(); }} />

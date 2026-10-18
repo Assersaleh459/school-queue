@@ -1,6 +1,6 @@
 # SchoolQ: progress
 
-Last updated: 2026-10-19. Current version **1.15.2** (not committed yet). 1.15.1 is pushed to GitHub `main`. License Generator **1.2.0**.
+Last updated: 2026-10-19. Current version **1.16.0** (committed and pushed; includes 1.15.2). 1.15.1 is pushed to GitHub `main`. License Generator **1.2.0**.
 
 ## Done (recent)
 | Version | What |
@@ -17,6 +17,7 @@ Last updated: 2026-10-19. Current version **1.15.2** (not committed yet). 1.15.1
 | 1.15.0 | **Voices export carries the school setup**: call wording, departments + services, announcements, voice choices (`src/backend/schoolSetup.js`, in `pack.json`). Import shows tick boxes and only adds (departments matched by EN/AR name; taken codes get a number; services by name; announcements by text). Kiosk/Reception "No departments yet" hints |
 | 1.15.1 | **Voice text cleanup** (`speakable()` in `voicegen.py`): symbols like `|` / `*` become a pause, "8 - 3" becomes "8 to 3" / "إلى", English digits become English words (VoiceTut's normalizer read all digits as Arabic). Existing clips recorded before this must be redone |
 | 1.15.2 | **Default password must be changed.** Signing in with `admin123` marks the login token; the server then refuses every request except "who am I" and "change password" (403 `must_change_password`), and the app shows a "Choose a new password" screen that can't be skipped. `admin123` can't be chosen as the new password. Changing it returns a fresh normal token. Kiosk and display screens don't sign in, so they aren't affected. The Home → 🔑 Password window now asks for 8+ characters, the same as the server (it allowed 6) |
+| 1.16.0 | **Fresh Start** tab (Vyra only: shown when the license has a voice password, the tools are unlocked and the user is super_admin). `POST /api/voice/wipe` asks for the voice password again + `WIPE`; `src/backend/wipe.js` backs up the DB and moves the voice folder to `backups/before-wipe/`, empties all school tables (keeps `app_state` + `migrations`), re-seeds one admin (`admin123`) with a **new user_id** so old logins fail. Seed moved to `src/backend/database/seed.js`. **Delete phrase entirely** (❌ in "Your phrases" and in Listen & fix): removes it from every voice, its flags and the queue. **"🎙 Not recorded"** label + info toast in Announcements when the announcement voice has no recording (recorded mode only) |
 | tooling | Playwright 1.64.1 (`@playwright/test` dev dependency), browsers in `E:\ms-playwright` (user env `PLAYWRIGHT_BROWSERS_PATH`, 718 MB) |
 
 Tests at 1.15.1: 90 backend under Node + 11 under Electron (`devices.test.js`, `schoolSetup.test.js`) + 8 frontend; voices export→import e2e with Playwright 17/17 (scratch script); `speakable()` 10/10.
@@ -25,8 +26,11 @@ Tests at 1.14.0: 95 backend (run `devices.test.js` under Electron, see SchoolQ-C
 
 Tests at 1.15.2: 95 backend under Node (5 new for the password rule) + 11 under Electron + 8 frontend; browser test on a fresh test server 8/8 (forced screen, 403 until changed, survives reload, `admin123` refused, home opens after, new token works, old password rejected).
 
+Tests at 1.16.0: 104 backend under Node (9 new: `voiceRoutes.test.js`, 2 engine tests) + 13 under Electron (`devices`, `schoolSetup`, new `wipe.test.js`) + 9 frontend; frontend build OK; browser test on a clean test server (port 3951, test license with a voice password, this PC only, 3-day expiry) 21/21: fresh install = 1 user and empty tables, tab hidden until unlocked and for admin role, ❌ in both lists, "Not recorded" label/toast (gone once recorded, none in online mode), wrong password refused, wipe → login → `admin123` → forced new password, backups present.
+
 ## In progress
-- 1.15.2 code is done and tested but **not committed or built** yet. 1.15.1 installers are in `dist\`; `dist-generator\SchoolQ License Generator Setup 1.2.0.exe`.
+- 1.15.2 + 1.16.0 are committed and pushed, but **installers are not built** yet (`npm run dist:server`, `npm run dist:staff`). 1.15.1 installers are in `dist\`; `dist-generator\SchoolQ License Generator Setup 1.2.0.exe`.
+- `config/settings.json` (unused sample departments) was deleted in 1.16.0. 🗑 "delete recording only" now also refreshes Listen & fix.
 
 ## Next
 - **User:** install License Generator 1.2.0 over the old one (history is kept).

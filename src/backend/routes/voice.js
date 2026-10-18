@@ -10,6 +10,8 @@ const { createEngine, validVoice, NUMBER_SLOTS, SHIPPED_VOICE, DEFAULT_ENGINE_DI
 const pack = require('../voice-engine/pack');
 const schoolSetup = require('../schoolSetup');
 const voiceLock = require('../voiceLock');
+const { wipeAll } = require('../wipe');
+const socketHandlers = require('../socket/handlers');
 const jwt = require('jsonwebtoken');
 const APP_VERSION = require('../../../package.json').version;
 
@@ -170,8 +172,16 @@ router.post('/generate', admin, (req, res) => {
   res.json({ success: true, queued });
 });
 
+// { lang, text, voice? } deletes that voice's recording; { lang, text, everywhere: true } deletes the
+// phrase from every voice (and the queue) — for a phrase typed by mistake
 router.post('/remove', admin, (req, res) => {
   const { lang, text } = req.body;
+  if (req.body.everywhere) {
+    const r = engine.removeEverywhere(lang, text);
+    if (!r.removed && !r.dropped) return res.status(404).json({ error: 'No recording for that text' });
+    log(req.user?.user_id, 'VOICE_PHRASE_DELETED', 'voice', null, { lang, text, voices: r.removed });
+    return res.json({ success: true, ...r });
+  }
   const voice = req.body.voice || activeVoice();
   if (!engine.remove(lang === 'ar' ? 'ar' : 'en', text, voice)) return res.status(404).json({ error: 'No recording for that text' });
   log(req.user?.user_id, 'VOICE_REMOVED', 'voice', null, { voice, lang, text });
@@ -233,6 +243,33 @@ router.post('/unlock', [authMiddleware, requireRole('super_admin', 'admin')], (r
   log(req.user.user_id, r.ok ? 'VOICE_UNLOCKED' : 'VOICE_UNLOCK_FAILED', 'voice', null, {});
   if (!r.ok) return res.status(r.wait ? 429 : 403).json({ error: r.error });
   res.json({ success: true, token: r.token });
+});
+
+// ── Fresh start (Vyra only) ──────────────────────────────────────────────────
+
+// { password, confirm: 'WIPE' } — puts the server back to a new install (see wipe.js). Only when
+// the license has a Vyra password (else any admin could do it), and that password is asked again.
+router.post('/wipe', [authMiddleware, requireRole('super_admin'), voiceLock.voiceGuard], async (req, res) => {
+  if (!voiceLock.isLocked()) return res.status(403).json({ error: 'Fresh Start needs a license with a Voice Recordings password' });
+  if (req.body.confirm !== 'WIPE') return res.status(422).json({ error: 'Type WIPE to confirm' });
+  const r = voiceLock.unlock(req.user.user_id, req.body.password);
+  if (!r.ok) {
+    log(req.user.user_id, 'DATA_WIPE_FAILED', 'system', null, {});
+    return res.status(r.wait ? 429 : 403).json({ error: r.error });
+  }
+  try {
+    await wipeAll({ db, voiceDir, engine, by: req.user.username });
+  } catch (err) {
+    console.error('Fresh start failed:', err);
+    return res.status(500).json({ error: `Fresh start failed: ${err.message}` });
+  }
+  invalidateSettings();
+  res.json({ success: true });
+  socketHandlers.forceLogoutAll();
+  req.io.emit('settings_updated');
+  req.io.emit('voice_updated');
+  req.io.emit('announcements_updated');
+  req.io.emit('queue_updated');
 });
 
 // ── Backup & move: voices as a file ──────────────────────────────────────────

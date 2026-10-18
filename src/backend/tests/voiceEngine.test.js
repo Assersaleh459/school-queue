@@ -127,6 +127,34 @@ test('remove deletes the clip and its manifest entry', async () => {
   expect(engine.remove('ar', 'الحسابات')).toBe(false);
 });
 
+test('removeEverywhere deletes a phrase from every voice, its flags and the queue', async () => {
+  make();
+  engine.enqueue([{ lang: 'en', text: 'Typo' }, { lang: 'en', text: 'Keep me' }]);
+  engine.enqueue([{ lang: 'en', text: 'Typo' }], { voice: 'Esraa' });
+  await until(() => engine.status().done === 3);
+  engine.setFlag('Esraa', [{ lang: 'en', text: 'Typo' }], true);
+  engine.pause();
+  engine.enqueue([{ lang: 'en', text: 'Typo' }], { voice: 'Yasmin' });   // still waiting
+  expect(engine.removeEverywhere('en', ' Typo. ')).toEqual({ removed: 2, dropped: 1 });
+  expect(manifest('Sarah').en).toEqual({ 'Keep me': clipFile('en', 'Keep me') });
+  expect(manifest('Esraa').en).toEqual({});
+  expect(fs.existsSync(path.join(dir, 'Esraa', clipFile('en', 'Typo')))).toBe(false);
+  expect(engine.listClips('Esraa').phrases).toEqual([]);
+  expect(engine.status().queue).toEqual([]);
+  expect(JSON.parse(fs.readFileSync(path.join(dir, 'Esraa', 'flags.json'), 'utf8'))).toEqual([]);
+  expect(engine.removeEverywhere('en', 'Typo')).toEqual({ removed: 0, dropped: 0 });
+});
+
+test('clear drops all waiting work and stops the worker without re-queueing', async () => {
+  make();
+  engine.enqueueNumbers('Omnia');
+  await until(() => engine.status().state === 'busy');
+  engine.clear();
+  expect(engine.status()).toMatchObject({ queue: [], current: null, paused: false });
+  await until(() => engine.status().state === 'off', 3000);
+  expect(engine.status().queue).toEqual([]);
+});
+
 test('stops the worker after it has been idle', async () => {
   make({ idleMs: 150 });
   engine.enqueue([{ lang: 'en', text: 'Hi' }]);

@@ -22,6 +22,7 @@ const Announcements = lazy(() => import('./pages/admin/Announcements'));
 const AuditLog     = lazy(() => import('./pages/admin/AuditLog'));
 const QueueControl = lazy(() => import('./pages/admin/QueueControl'));
 const VoiceRecordings = lazy(() => import('./pages/admin/VoiceRecordings'));
+const FreshStart   = lazy(() => import('./pages/admin/FreshStart'));
 const License      = lazy(() => import('./pages/admin/License'));
 const LicenseExpired = lazy(() => import('./pages/LicenseExpired'));
 const Reports      = lazy(() => import('./pages/Reports'));
@@ -137,6 +138,7 @@ export default function App() {
             <Route path="audit-log" element={<AuditLog />} />
             <Route path="queue-control" element={<QueueControl />} />
             <Route path="voice" element={<VoiceRecordings />} />
+            <Route path="fresh-start" element={<FreshStart />} />
             <Route path="license" element={<License />} />
           </Route>
 

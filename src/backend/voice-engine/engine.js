@@ -163,7 +163,9 @@ function createEngine({ voiceDir, engineDir = DEFAULT_ENGINE_DIR, command, idleM
     } else if (ev.type === 'fatal') {
       lastError = ev.error;
     } else if (ev.type === 'done' && current && ev.id === current.id) {
-      if (current.key && !current.take) {    // phrase → record it in the voice's manifest
+      if (current.dropped) {                 // its phrase was deleted while it was being recorded
+        try { fs.unlinkSync(current.out); } catch {}
+      } else if (current.key && !current.take) {    // phrase → record it in the voice's manifest
         const m = readManifest(current.voice);
         (m[current.lang] ||= {})[current.key] = current.file;
         writeManifest(current.voice, m);
@@ -282,6 +284,16 @@ function createEngine({ voiceDir, engineDir = DEFAULT_ENGINE_DIR, command, idleM
     return kick(added);
   }
 
+  // Fresh start: drop all waiting and running work and stop the worker
+  function clear() {
+    queue.length = 0;
+    failed.length = 0;
+    current = null;            // so the worker's exit doesn't put it back in the queue
+    paused = false;
+    stop();
+    emitter.emit('status');
+  }
+
   function remove(lang, text, voice = SHIPPED_VOICE) {
     if (!validVoice(voice)) return false;
     const key = clipKey(text);
@@ -294,6 +306,27 @@ function createEngine({ voiceDir, engineDir = DEFAULT_ENGINE_DIR, command, idleM
     try { fs.unlinkSync(takePath(voice, { lang, text: key })); } catch {}
     emitter.emit('change');
     return true;
+  }
+
+  // A phrase typed by mistake: delete it from every voice (recording, new take, flag) and from
+  // the queue. → { removed: number of voices it was removed from, dropped: queued jobs dropped }
+  function removeEverywhere(lang, text) {
+    lang = lang === 'ar' ? 'ar' : 'en';
+    const key = clipKey(text);
+    if (!key) return { removed: 0, dropped: 0 };
+    let removed = 0;
+    const voices = fs.existsSync(voiceDir) ? fs.readdirSync(voiceDir, { withFileTypes: true }) : [];
+    for (const d of voices) {
+      if (!d.isDirectory() || !validVoice(d.name)) continue;
+      if (remove(lang, key, d.name)) removed++;
+      setFlag(d.name, [{ lang, text: key }], false);
+    }
+    const before = queue.length;
+    for (let i = queue.length - 1; i >= 0; i--) if (queue[i].lang === lang && queue[i].key === key) queue.splice(i, 1);
+    let dropped = before - queue.length;
+    if (current && current.lang === lang && current.key === key) { current.dropped = true; dropped++; }
+    if (dropped) emitter.emit('status');
+    return { removed, dropped };
   }
 
   // Every clip a voice has, for listening through: numbers (315) and phrases, each with
@@ -374,7 +407,7 @@ function createEngine({ voiceDir, engineDir = DEFAULT_ENGINE_DIR, command, idleM
   }
 
   return Object.assign(emitter, {
-    status, enqueue, enqueueNumbers, remove, pause, resume, stop, readManifest, numberCount, installed,
+    status, enqueue, enqueueNumbers, remove, removeEverywhere, clear, pause, resume, stop, readManifest, numberCount, installed,
     listClips, keepTake, restoreNumber, setFlag, numberPath,
   });
 }

@@ -76,9 +76,14 @@ module.exports = (io) => {
   }, DEVICE_HEARTBEAT_MS).unref();
 
   module.exports.forceLogout = (userId) => forceLogout(io, userId);
+  // Fresh Start: every signed-in screen goes back to the login page (displays and kiosks don't sign in)
+  module.exports.forceLogoutAll = () => {
+    for (const userId of userSockets.keys()) forceLogout(io, userId);
+  };
   // Admin freed this device's license slot → sign it out now
   module.exports.kickDevice = (deviceId) => io.to(`device_${deviceId}`).emit('force_logout');
 };
 
 module.exports.forceLogout = () => {}; // placeholder until handlers(io) is called
 module.exports.kickDevice = () => {};
+module.exports.forceLogoutAll = () => {};

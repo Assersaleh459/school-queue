@@ -32,7 +32,7 @@ export function TakeReview({ onPlay, onKeep, compact = false }) {
   );
 }
 
-export default function VoiceBrowser({ voices, defaultVoice, installed, engine, onChanged }) {
+export default function VoiceBrowser({ voices, defaultVoice, installed, engine, onChanged, refresh }) {
   const [voice, setVoice]       = useState(defaultVoice);
   const [data, setData]         = useState(null);
   const [stamp, setStamp]       = useState(0);
@@ -53,8 +53,8 @@ export default function VoiceBrowser({ voices, defaultVoice, installed, engine, 
     }
   }, [voice]);
 
-  // reload on voice change and whenever the engine finishes a clip
-  useEffect(() => { load(); }, [load, engine?.done]);
+  // reload on voice change, whenever the engine finishes a clip, and when the page deleted one
+  useEffect(() => { load(); }, [load, engine?.done, refresh]);
 
   const busy = new Map();
   for (const j of engine?.queue || []) if (j.voice === voice) busy.set(jobId(j), 'queued');
@@ -136,6 +136,20 @@ export default function VoiceBrowser({ voices, defaultVoice, installed, engine, 
       onChanged?.();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Could not keep the take');
+    }
+  };
+
+  // A phrase typed by mistake: gone from every voice, not only this one
+  const removeEverywhere = async (c) => {
+    if (!confirm(`Remove this phrase from every voice?\n\n"${c.text}"`)) return;
+    try {
+      await voiceAPI.remove(c.lang, c.text, undefined, true);
+      if (selected === clipId(c)) setSelected(null);
+      toast.success('Phrase deleted');
+      load();
+      onChanged?.();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Delete failed');
     }
   };
 
@@ -244,9 +258,9 @@ export default function VoiceBrowser({ voices, defaultVoice, installed, engine, 
                     const id = clipId(c);
                     const state = busy.get(id);
                     return (
-                      <li key={id}>
+                      <li key={id} className="flex items-center">
                         <button onClick={() => select(c)}
-                          className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${selected === id ? 'bg-teal/10' : 'hover:bg-gray-50'}`}>
+                          className={`flex-1 min-w-0 flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${selected === id ? 'bg-teal/10' : 'hover:bg-gray-50'}`}>
                           <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-navy text-teal">{c.lang.toUpperCase()}</span>
                           <span className="flex-1 truncate" dir={c.lang === 'ar' ? 'rtl' : 'ltr'}>{c.text}</span>
                           {playing === id && <span className="text-teal text-xs">♪</span>}
@@ -254,6 +268,8 @@ export default function VoiceBrowser({ voices, defaultVoice, installed, engine, 
                           {c.take && <span className="text-xs text-blue-700 font-semibold">New take</span>}
                           {c.flagged && <span className="text-amber-600">⚑</span>}
                         </button>
+                        <button onClick={() => removeEverywhere(c)} title="Delete phrase (from every voice)" aria-label={`Delete phrase ${c.text}`}
+                          className="px-2 py-2 text-sm hover:bg-gray-100">❌</button>
                       </li>
                     );
                   })}

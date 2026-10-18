@@ -91,6 +91,12 @@ export function announcementTexts(a) {
     .filter(t => clipKey(t.text));
 }
 
+// The parts of an announcement the announcement voice has no recording for — the display reads
+// those with the online voice (or Windows' voice when offline): [{ lang, text }]
+export function unrecordedTexts(announcement, voiceManifest = {}) {
+  return announcementTexts(announcement).filter(t => !voiceManifest[t.lang]?.[clipKey(t.text)]);
+}
+
 // Every piece the school's announcements need a recording for, once per language:
 // [{ lang, text, source: 'template' | 'department' | 'announcement' }]
 export function requiredPieces(templates, departments, announcements = []) {

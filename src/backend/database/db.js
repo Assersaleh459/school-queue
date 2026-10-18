@@ -1,9 +1,9 @@
 require('dotenv').config({ path: require('path').join(__dirname, '../../../.env') });
 const Database = require('better-sqlite3');
-const bcrypt = require('bcrypt');
 const fs = require('fs');
 const path = require('path');
 const { runMigrations } = require('./migrations/runner');
+const { seedFresh } = require('./seed');
 
 // In Electron production, DB_PATH is set to app.getPath('userData') to avoid
 // writing inside read-only Program Files.
@@ -24,15 +24,7 @@ function initDatabase() {
 
   const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get();
   if (userCount.count === 0) {
-    const seed = fs.readFileSync(path.join(__dirname, 'seed.sql'), 'utf8');
-    db.exec(seed);
-
-    const hash = bcrypt.hashSync('admin123', 10);
-    db.prepare(
-      `INSERT OR IGNORE INTO users (user_id, username, password_hash, full_name, role, department_id, is_active, created_at)
-       VALUES (1, 'admin', ?, 'System Admin', 'super_admin', NULL, 1, datetime('now'))`
-    ).run(hash);
-
+    seedFresh(db, { adminId: 1 });
     console.log('✓ Database seeded');
   }
 

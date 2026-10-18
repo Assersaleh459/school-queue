@@ -104,6 +104,20 @@ To stop a school from changing voices, type a **Voice Recordings password** in t
 
 ---
 
+## Fresh Start: erase a server back to a new install (1.16.0+)
+
+Use it after a demo, or before you hand a used server to a school.
+
+- It works only when the license has a **Voice Recordings password**. Without one, the tab doesn't exist.
+- Sign in as the **super admin**. Unlock the voice tools (**Settings → "Voice tools (Vyra Systems)"**). A **Fresh Start** tab then shows under Voice Recordings.
+- Press **Erase all data…**, enter the Voice Recordings password again, and type `WIPE`.
+- **Erased:** tickets and reports, departments and services, all users, announcements, the audit log, staff devices, settings (the name goes back to "My School") and voice recordings.
+- **Kept:** the license, the voice engine, and a copy of the old database and voice folder in `%APPDATA%\SchoolQ\backups\before-wipe\`.
+- Everyone is signed out. Sign in again as `admin` / `admin123`; the app asks for a new password.
+- To bring voices back, use **Import voices** (below), or copy the voice folder back from `before-wipe`.
+
+---
+
 ## Moving voices and the voice engine to a new school
 
 Voice Recordings → **Backup & move**:

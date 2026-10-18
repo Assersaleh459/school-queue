@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { adminAPI, voiceAPI } from '../../lib/api';
+import { adminAPI, voiceAPI, settingsAPI } from '../../lib/api';
 import { toast } from '../../store/useToastStore';
-import { announcementTexts, clipKey, phraseUrl } from '../../lib/voiceClips';
+import { announcementTexts, clipKey, phraseUrl, unrecordedTexts } from '../../lib/voiceClips';
 
 const EMPTY = { message_text: '', message_text_ar: '', speak_language: 'en', display_order: '', is_active: true };
 
@@ -47,6 +47,17 @@ async function preview(a) {
   }
 }
 
+// "recorded" voice mode: { voice, manifest } of the announcement voice; null in "online" mode
+async function loadRecordedVoice() {
+  const [pub, man] = await Promise.all([settingsAPI.getPublic(), voiceAPI.manifest()]);
+  if (pub.data?.voice_mode === 'online') return null;
+  const m = man.data || {};
+  const a = m.announce || m;
+  return { voice: a.voice || m.voice || 'Sarah', manifest: a };
+}
+
+const notRecordedHint = (voice) => `Not recorded in the ${voice} voice yet, so the display reads it with the online voice. Record it in Voice Recordings.`;
+
 export default function Announcements() {
   const [announcements, setAnnouncements] = useState([]);
   const [showForm, setShowForm]           = useState(false);
@@ -55,8 +66,11 @@ export default function Announcements() {
   const [error, setError]                 = useState('');
   const [saving, setSaving]               = useState(false);
   const [testing, setTesting]             = useState(false);
+  const [recorded, setRecorded]           = useState(null);   // see loadRecordedVoice
 
-  useEffect(() => { load(); }, []);
+  const loadVoice = () => loadRecordedVoice().then(v => { setRecorded(v); return v; }).catch(() => null);
+  useEffect(() => { load(); loadVoice(); }, []);
+  const notRecorded = (a, v = recorded) => !!v && unrecordedTexts(a, v.manifest).length > 0;
 
   const load = () => adminAPI.getAnnouncements().then(r => setAnnouncements(r.data)).catch(() => {});
 
@@ -99,6 +113,8 @@ export default function Announcements() {
       }
       setShowForm(false);
       load();
+      const v = await loadVoice();
+      if (notRecorded(payload, v)) toast.info(`Saved. ${notRecordedHint(v.voice)}`, 8000);
     } catch (err) {
       setError(err.response?.data?.error || 'Save failed');
     } finally {
@@ -148,6 +164,11 @@ export default function Announcements() {
                   {LANG_LABELS[a.speak_language || 'en']}
                 </span>
                 <p className="font-semibold text-gray-800 truncate">{a.message_text}</p>
+                {!!a.is_active && notRecorded(a) && (
+                  <span className="shrink-0 text-xs font-semibold px-2 py-0.5 rounded bg-amber-100 text-amber-800" title={notRecordedHint(recorded.voice)}>
+                    🎙 Not recorded
+                  </span>
+                )}
               </div>
               {a.message_text_ar && (
                 <p className="text-sm text-gray-500 mt-0.5 text-right font-arabic" dir="rtl">{a.message_text_ar}</p>

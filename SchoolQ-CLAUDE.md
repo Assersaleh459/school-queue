@@ -166,7 +166,7 @@ Jest config: `testEnvironment: node`, `testMatch: **/tests/**/*.test.js`. Note: 
 | `audio.play()` resolves too early | Resolves on playback START | Use the `ended` event for audio sequencing |
 | `.env` bundled in installer | Old build config | `.env` is excluded from `eb-server.json` — keep it that way |
 | `package.json` squashed onto one line after `npm install` | npm can't detect the indent from the first line `{"name": ...` | Restore the layout from git and re-apply only the real changes |
-| `schoolSetup.test.js` (and `devices.test.js`) crash under `npm test` | They use the real better-sqlite3 (Electron ABI) | Run them with `ELECTRON_RUN_AS_NODE=1 ./node_modules/electron/dist/electron.exe node_modules/jest/bin/jest.js <file>` |
+| `schoolSetup.test.js`, `devices.test.js` and `wipe.test.js` crash under `npm test` | They use the real better-sqlite3 (Electron ABI) | Run them with `ELECTRON_RUN_AS_NODE=1 ./node_modules/electron/dist/electron.exe node_modules/jest/bin/jest.js <file>` |
 
 ---
 

@@ -20,5 +20,5 @@ export default useToastStore;
 export const toast = {
   error:   (msg) => useToastStore.getState().addToast(msg, 'error'),
   success: (msg) => useToastStore.getState().addToast(msg, 'success', 3000),
-  info:    (msg) => useToastStore.getState().addToast(msg, 'info',    3000),
+  info:    (msg, ms = 3000) => useToastStore.getState().addToast(msg, 'info', ms),
 };

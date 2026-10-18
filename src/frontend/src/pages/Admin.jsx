@@ -37,6 +37,12 @@ export default function Admin() {
               `flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-teal text-white' : 'text-gray-300 hover:bg-white hover:bg-opacity-10'}`
             }>Voice Recordings</NavLink>
           )}
+          {/* Vyra only: needs a license with a voice password, unlocked */}
+          {voice.ready && voice.locked && voice.open && user?.role === 'super_admin' && (
+            <NavLink to="/admin/fresh-start" className={({ isActive }) =>
+              `flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-teal text-white' : 'text-gray-300 hover:bg-white hover:bg-opacity-10'}`
+            }>Fresh Start</NavLink>
+          )}
           <NavLink to="/admin/license" className={({ isActive }) =>
             `flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-teal text-white' : 'text-gray-300 hover:bg-white hover:bg-opacity-10'}`
           }>License</NavLink>
