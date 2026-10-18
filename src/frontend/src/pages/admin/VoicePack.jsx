@@ -1,8 +1,44 @@
-// Backup & move: voices to / from a file (any PC), and the voice engine (server PC only, ~8 GB)
+// Backup & move: voices to / from a file (any PC), and the voice engine (server PC only, ~8 GB).
+// The voices file can also carry the school setup the recordings belong to (call wording,
+// departments, announcements, voice choices) — a recording only plays where its exact text exists.
 import { useEffect, useState } from 'react';
 import api from '../../lib/api';
 import { unlockToken } from '../../lib/voiceLock';
 import { toast } from '../../store/useToastStore';
+
+const SETUP_PARTS = [
+  { key: 'callWording',   label: 'Ticket-call wording', count: (c) => (c.callWording ? `${c.callWording} texts` : null) },
+  { key: 'departments',   label: 'Departments + services', count: (c) => (c.departments ? `${c.departments} department${c.departments === 1 ? '' : 's'} · ${c.services || 0} service${c.services === 1 ? '' : 's'}` : null) },
+  { key: 'announcements', label: 'Announcements', count: (c) => (c.announcements ? `${c.announcements}` : null) },
+  { key: 'voices',        label: 'Voice choices', count: (c) => (c.voices ? [c.voices.voice_speaker && `calls: ${c.voices.voice_speaker}`, c.voices.voice_announce && `announcements: ${c.voices.voice_announce}`].filter(Boolean).join(' · ') || null : null) },
+];
+const ALL_PARTS = Object.fromEntries(SETUP_PARTS.map(p => [p.key, true]));
+
+function setupSummary(done) {
+  const bits = [];
+  if (done.callWording) bits.push('call wording');
+  if (done.departments) bits.push(`${done.departments} department${done.departments === 1 ? '' : 's'}`);
+  if (done.services) bits.push(`${done.services} service${done.services === 1 ? '' : 's'}`);
+  if (done.announcements) bits.push(`${done.announcements} announcement${done.announcements === 1 ? '' : 's'}`);
+  if (done.voices?.length) bits.push('voice choices');
+  return bits.join(', ');
+}
+
+function SetupChoices({ counts, value, onChange, onlyAvailable = false }) {
+  const parts = SETUP_PARTS.filter(p => !onlyAvailable || p.count(counts || {}));
+  if (!parts.length) return null;
+  return (
+    <div className="flex flex-col gap-1 mb-3">
+      {parts.map(p => (
+        <label key={p.key} className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={!!value[p.key]} onChange={e => onChange({ ...value, [p.key]: e.target.checked })} />
+          <span className="font-medium text-navy">{p.label}</span>
+          <span className="text-xs text-gray-400">{p.count(counts || {}) || 'none'}</span>
+        </label>
+      ))}
+    </div>
+  );
+}
 
 export default function VoicePack({ voices, installed, onImported }) {
   const withRecordings = voices.filter(v => v.phrases > 0 || (v.name !== 'Sarah' && v.numbers > 0));
@@ -11,15 +47,19 @@ export default function VoicePack({ voices, installed, onImported }) {
   const [pick, setPick] = useState({});
   const [upload, setUpload] = useState(null);           // 0..1 while sending the file
   const [engineJob, setEngineJob] = useState(null);     // { kind, progress }
+  const [include, setInclude] = useState(ALL_PARTS);    // school setup to export with the voices
+  const [counts, setCounts] = useState(null);           // what this school has, for the export choices
+  const [pickSetup, setPickSetup] = useState({});       // school setup to bring in on import
   const enginePack = !!window.electronAPI?.enginePackAvailable?.();
 
   const selected = chosen ?? withRecordings.map(v => v.name);
 
   useEffect(() => window.electronAPI?.onEnginePackProgress?.((p) => setEngineJob(j => (j ? { ...j, progress: p } : j))), []);
+  useEffect(() => { api.get('/voice/export-setup').then(r => setCounts(r.data)).catch(() => setCounts({})); }, []);
 
   const exportVoices = async () => {
     try {
-      const r = await api.post('/voice/export-link', { voices: selected });
+      const r = await api.post('/voice/export-link', { voices: selected, setup: include });
       window.location.href = r.data.url;     // the browser / app saves the file
     } catch (err) {
       toast.error(err.response?.data?.error || 'Could not export');
@@ -39,6 +79,7 @@ export default function VoicePack({ voices, installed, onImported }) {
       });
       setStaged(r.data);
       setPick(Object.fromEntries(r.data.voices.map(v => [v.name, true])));
+      setPickSetup(Object.fromEntries(SETUP_PARTS.filter(p => p.count(r.data.setup || {})).map(p => [p.key, true])));
     } catch (err) {
       toast.error(err.response?.data?.error || 'Could not read the file');
     } finally {
@@ -49,8 +90,9 @@ export default function VoicePack({ voices, installed, onImported }) {
   const applyImport = async () => {
     const names = staged.voices.filter(v => pick[v.name]).map(v => v.name);
     try {
-      const r = await api.post(`/voice/import/${staged.id}`, { voices: names });
-      toast.success(`Imported ${r.data.imported.join(', ')}`);
+      const r = await api.post(`/voice/import/${staged.id}`, { voices: names, setup: pickSetup });
+      const added = setupSummary(r.data.setup || {});
+      toast.success([r.data.imported.length && `Imported ${r.data.imported.join(', ')}`, added && `Added ${added}`].filter(Boolean).join(' — ') || 'Nothing new to add');
       setStaged(null);
       onImported?.();
     } catch (err) {
@@ -90,6 +132,8 @@ export default function VoicePack({ voices, installed, onImported }) {
                   </label>
                 ))}
               </div>
+              <p className="text-xs font-semibold text-gray-500 mt-1 mb-1">Also include, so the recordings are used at the other school:</p>
+              <SetupChoices counts={counts} value={include} onChange={setInclude} />
               <button onClick={exportVoices} disabled={!selected.length}
                 className="px-4 py-2 bg-navy text-white rounded-lg text-sm font-semibold hover:bg-opacity-90 active:scale-95 transition disabled:opacity-40">
                 Export {selected.length === withRecordings.length ? 'all' : selected.length} voice{selected.length === 1 ? '' : 's'}
@@ -120,10 +164,16 @@ export default function VoicePack({ voices, installed, onImported }) {
                   </label>
                 ))}
               </div>
+              {staged.setup && (
+                <>
+                  <p className="text-xs font-semibold text-gray-500 mt-1 mb-1">School setup in this file (added; what this school already has is kept):</p>
+                  <SetupChoices counts={staged.setup} value={pickSetup} onChange={setPickSetup} onlyAvailable />
+                </>
+              )}
               <div className="flex gap-2">
-                <button onClick={applyImport} disabled={!Object.values(pick).some(Boolean)}
+                <button onClick={applyImport} disabled={!Object.values(pick).some(Boolean) && !Object.values(pickSetup).some(Boolean)}
                   className="px-4 py-2 bg-teal text-white rounded-lg text-sm font-semibold hover:bg-opacity-90 active:scale-95 transition disabled:opacity-40">
-                  Import {Object.values(pick).filter(Boolean).length} voice{Object.values(pick).filter(Boolean).length === 1 ? '' : 's'}
+                  Import
                 </button>
                 <button onClick={() => setStaged(null)} className="px-3 py-2 rounded-lg text-sm border border-gray-300 hover:bg-gray-50">Cancel</button>
               </div>

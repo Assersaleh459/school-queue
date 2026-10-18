@@ -8,6 +8,7 @@ const { getSetting, invalidate: invalidateSettings } = require('../settingsCache
 const { log } = require('../audit');
 const { createEngine, validVoice, NUMBER_SLOTS, SHIPPED_VOICE, DEFAULT_ENGINE_DIR, HERE } = require('../voice-engine/engine');
 const pack = require('../voice-engine/pack');
+const schoolSetup = require('../schoolSetup');
 const voiceLock = require('../voiceLock');
 const jwt = require('jsonwebtoken');
 const APP_VERSION = require('../../../package.json').version;
@@ -239,11 +240,19 @@ router.post('/unlock', [authMiddleware, requireRole('super_admin', 'admin')], (r
 // Downloads are plain links (the browser saves them), so they carry a 5-minute token
 const linkFor = (req, payload) => `/api/voice/export?t=${encodeURIComponent(jwt.sign({ ...payload, user_id: req.user.user_id }, process.env.JWT_SECRET, { expiresIn: '5m' }))}`;
 
-// { voices: [names] } → { url }
+// Which parts of the school setup a request asks for: { callWording, voices, departments, announcements }
+const setupParts = (body) => Object.fromEntries(schoolSetup.PARTS.map(p => [p, !!body?.[p]]));
+
+// { voices: [names], setup: { callWording, voices, departments, announcements } } → { url }
 router.post('/export-link', admin, (req, res) => {
   const voices = (Array.isArray(req.body.voices) ? req.body.voices : []).filter(validVoice);
   if (!voices.length) return res.status(422).json({ error: 'Choose at least one voice' });
-  res.json({ url: linkFor(req, { dl: 'voices', voices }) });
+  res.json({ url: linkFor(req, { dl: 'voices', voices, setup: setupParts(req.body.setup) }) });
+});
+
+// Counts for the export choices: { departments, services, announcements, callWording, voices }
+router.get('/export-setup', admin, (req, res) => {
+  res.json(schoolSetup.summarize(schoolSetup.collect(db, setupParts({ callWording: 1, voices: 1, departments: 1, announcements: 1 }))) || {});
 });
 
 router.get('/export', async (req, res) => {
@@ -253,8 +262,9 @@ router.get('/export', async (req, res) => {
   res.setHeader('Content-Type', 'application/octet-stream');
   res.setHeader('Content-Disposition', `attachment; filename="SchoolQ voices ${new Date().toISOString().slice(0, 10)}.schoolq-voices"`);
   try {
-    await pack.exportVoices(voiceDir, t.voices, res, { appVersion: APP_VERSION });
-    log(t.user_id, 'VOICES_EXPORTED', 'voice', null, { voices: t.voices });
+    const setup = schoolSetup.collect(db, t.setup || {});
+    await pack.exportVoices(voiceDir, t.voices, res, { appVersion: APP_VERSION, setup });
+    log(t.user_id, 'VOICES_EXPORTED', 'voice', null, { voices: t.voices, setup: schoolSetup.summarize(setup) });
     res.end();
   } catch (err) {
     if (!res.headersSent) res.status(422).json({ error: err.message });
@@ -262,23 +272,35 @@ router.get('/export', async (req, res) => {
   }
 });
 
-// Step 1: upload the file (raw body) → which voices it holds
+// Step 1: upload the file (raw body) → which voices and which school setup it holds
 router.post('/import', admin, async (req, res) => {
   pack.cleanStaged(voiceDir);
   try {
-    res.json(await pack.stageVoices(voiceDir, req));
+    const staged = await pack.stageVoices(voiceDir, req);
+    res.json({ ...staged, setup: schoolSetup.summarize(staged.setup) });
   } catch (err) {
     res.status(422).json({ error: err.message });
   }
 });
 
-// Step 2: { voices: [names] } — they replace the same voices here; other voices are kept
+// Step 2: { voices: [names], setup: { callWording, voices, departments, announcements } } — the
+// voices replace the same voices here (others are kept); the setup is added (see schoolSetup.js)
 router.post('/import/:id', admin, (req, res) => {
   try {
+    const parts = setupParts(req.body.setup);
+    const setup = pack.stagedSetup(voiceDir, req.params.id);
     const done = pack.applyVoices(voiceDir, req.params.id, Array.isArray(req.body.voices) ? req.body.voices : []);
+    const added = schoolSetup.apply(db, setup, parts, {
+      canUseVoice: (name, use) => validVoice(name)
+        && (use === 'calls' ? engine.numberCount(name) >= NUMBER_SLOTS.length : name === SHIPPED_VOICE || fs.existsSync(path.join(voiceDir, name))),
+    });
+    invalidateSettings();
     engine.emit('change');
-    log(req.user.user_id, 'VOICES_IMPORTED', 'voice', null, { voices: done });
-    res.json({ success: true, imported: done });
+    req.io.emit('voice_updated');
+    req.io.emit('settings_updated');
+    req.io.emit('announcements_updated');
+    log(req.user.user_id, 'VOICES_IMPORTED', 'voice', null, { voices: done, setup: added });
+    res.json({ success: true, imported: done, setup: added });
   } catch (err) {
     res.status(422).json({ error: err.message });
   }

@@ -61,6 +61,25 @@ test('voices: an imported voice replaces the same voice; pending takes are not e
   expect(fs.existsSync(path.join(to, 'Sarah', 'takes'))).toBe(false);
 });
 
+test('voices: the school setup travels in the file and can be read before the import is applied', async () => {
+  const { stagedSetup } = require('../voice-engine/pack');
+  const from = tmp(); const to = tmp(); const file = path.join(tmp(), 'v.schoolq-voices');
+  makeVoices(from);
+  const setup = { callWording: { call_template_ar: 'تنبيه من فضلك' }, departments: [{ name: 'الحسابات', code: 'ACC', services: [] }] };
+  await toFile(out => exportVoices(from, ['Sarah'], out, { appVersion: '1.14.0', setup }), file);
+  const staged = await stageVoices(to, fs.createReadStream(file));
+  expect(staged.setup).toEqual(setup);
+  expect(stagedSetup(to, staged.id)).toEqual(setup);
+  expect(stagedSetup(to, '../../etc')).toBeNull();
+  applyVoices(to, staged.id, ['Sarah']);
+  expect(stagedSetup(to, staged.id)).toBeNull();   // folder gone after the import
+
+  // a file without setup (older SchoolQ, or nothing ticked)
+  const plain = path.join(tmp(), 'p.schoolq-voices');
+  await toFile(out => exportVoices(from, ['Sarah'], out, { setup: {} }), plain);
+  expect((await stageVoices(tmp(), fs.createReadStream(plain))).setup).toBeNull();
+});
+
 test('voices: a file that is not a voices pack is refused', async () => {
   const to = tmp(); const bad = path.join(tmp(), 'bad.schoolq-voices');
   write(bad, 'definitely not a tar file');

@@ -1,7 +1,9 @@
 // Backup & move: voices and the voice engine as single files, so a new school's server gets
 // them without the 5 GB download and hours of voice preparation.
 //
-//   *.schoolq-voices   tar: pack.json + <Voice>/ folders (recordings, manifest, flags — no pending takes)
+//   *.schoolq-voices   tar: pack.json + <Voice>/ folders (recordings, manifest, flags — no pending takes).
+//                      pack.json may also carry the school setup the recordings belong to
+//                      (call wording, departments, announcements, voice choices — see schoolSetup.js).
 //   *.schoolq-engine   tar: VoiceEngine/{python,uv,venv,model,hf-cache} + VoiceEngine/schoolq-engine.json
 //                      (download caches are left out). The engine is self-contained; only the
 //                      venv's pyvenv.cfg holds an absolute path, which import rewrites.
@@ -37,7 +39,7 @@ function describeVoice(dir, name) {
 }
 
 // Streams a .schoolq-voices archive of the given voices to `output` (a writable stream)
-async function exportVoices(voiceDir, voices, output, { appVersion } = {}) {
+async function exportVoices(voiceDir, voices, output, { appVersion, setup } = {}) {
   const names = voices.filter(v => validVoice(v) && fs.existsSync(path.join(voiceDir, v)));
   if (!names.length) throw new Error('None of these voices has recordings on this PC');
   const meta = fs.mkdtempSync(path.join(voiceDir, '.export-'));
@@ -45,6 +47,7 @@ async function exportVoices(voiceDir, voices, output, { appVersion } = {}) {
     fs.writeFileSync(path.join(meta, 'pack.json'), JSON.stringify({
       kind: 'schoolq-voices', version: 1, appVersion: appVersion || null, exportedAt: new Date().toISOString(),
       voices: names.map(n => describeVoice(path.join(voiceDir, n), n)),
+      ...(setup && Object.keys(setup).length && { setup }),
     }, null, 2));
     await runTar(['-c', '-f', '-', '--exclude', '*/takes', '-C', meta, 'pack.json', '-C', voiceDir, ...names], { output });
   } finally {
@@ -53,7 +56,7 @@ async function exportVoices(voiceDir, voices, output, { appVersion } = {}) {
 }
 
 // Step 1 of an import: unpack into a staging folder next to the voices (same disk, so step 2
-// is a rename). → { id, voices: [{ name, phrases, numbers, exists }] }
+// is a rename). → { id, voices: [{ name, phrases, numbers, exists }], setup: <pack.json setup> | null }
 async function stageVoices(voiceDir, input) {
   fs.mkdirSync(voiceDir, { recursive: true });
   const id = crypto.randomBytes(6).toString('hex');
@@ -67,11 +70,17 @@ async function stageVoices(voiceDir, input) {
       .filter(e => e.isDirectory() && validVoice(e.name))
       .map(e => ({ ...describeVoice(path.join(dir, e.name), e.name), exists: fs.existsSync(path.join(voiceDir, e.name)) }));
     if (!voices.length) throw new Error('no voices inside');
-    return { id, voices };
+    return { id, voices, setup: pack.setup || null };
   } catch (err) {
     fs.rmSync(dir, { recursive: true, force: true });
     throw new Error(`This is not a SchoolQ voices file (${err.message})`);
   }
+}
+
+// The school setup inside a staged import (read before applyVoices removes the folder)
+function stagedSetup(voiceDir, id) {
+  if (!/^[0-9a-f]{12}$/.test(id)) return null;
+  try { return JSON.parse(fs.readFileSync(path.join(voiceDir, `.import-${id}`, 'pack.json'), 'utf8')).setup || null; } catch { return null; }
 }
 
 // Step 2: the chosen voices replace the same voices on this PC; others are kept.
@@ -186,4 +195,4 @@ async function importEngine(file, engineDir, { onProgress } = {}) {
   }
 }
 
-module.exports = { exportVoices, stageVoices, applyVoices, cleanStaged, exportEngine, importEngine, engineFlavor, TAR };
+module.exports = { exportVoices, stageVoices, stagedSetup, applyVoices, cleanStaged, exportEngine, importEngine, engineFlavor, TAR };
