@@ -6,6 +6,7 @@ import TicketReceipt from '../../components/TicketReceipt';
 import useAuthStore from '../../store/useAuthStore';
 import { useVoiceLock, lockVoice, useWipeLock, lockWipe } from '../../lib/voiceLock';
 import VoiceUnlock from '../../components/VoiceUnlock';
+import { useLiveRefresh } from '../../lib/useLiveRefresh';
 import { useNavigate } from 'react-router-dom';
 
 // Small links at the bottom: Voice Recordings and Fresh Start are hidden while the license's Vyra
@@ -111,10 +112,13 @@ export default function Settings() {
   // Recorded (offline) voice: which template/department pieces have no clip yet
   const [voiceClips, setVoiceClips]   = useState({});
   const [voiceDepts, setVoiceDepts]   = useState([]);
-  useEffect(() => {
+  const loadVoiceInfo = () => {
     api.get('/voice/manifest').then(r => setVoiceClips(r.data || {})).catch(() => {});
     adminAPI.getDepartments().then(r => setVoiceDepts(r.data.filter(d => d.is_active))).catch(() => {});
-  }, []);
+  };
+  useEffect(loadVoiceInfo, []);
+  // Only this read-only "not recorded" list follows the server; the settings form is never reloaded under the person typing
+  useLiveRefresh(['voice_updated', 'departments_updated'], loadVoiceInfo);
   const unrecorded = missingClips({
     callEn:   settings.call_template_en   || DEFAULT_TEMPLATES.callEn,
     recallEn: settings.recall_template_en || DEFAULT_TEMPLATES.recallEn,

@@ -4,17 +4,20 @@ import { adminAPI } from '../../lib/api';
 import { departmentAPI } from '../../lib/api';
 import { licenseAPI } from '../../lib/licenseClient';
 import { LicenseCard } from '../../components/LicenseNotice';
+import { useLiveRefresh } from '../../lib/useLiveRefresh';
 
 export default function Overview() {
   const [stats, setStats] = useState(null);
   const [departments, setDepartments] = useState([]);
   const [lic, setLic] = useState(null);
 
-  useEffect(() => {
+  const load = () => {
     adminAPI.getDepartments().then(r => setDepartments(r.data)).catch(() => {});
     adminAPI.getUsers().then(r => setStats(r.data)).catch(() => {});
     licenseAPI.get().then(r => setLic(r.data)).catch(() => {});
-  }, []);
+  };
+  useEffect(load, []);
+  useLiveRefresh(['departments_updated', 'users_updated', 'license_updated'], load);
 
   const activeDepts = departments.filter(d => d.is_active).length;
 

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { settingsAPI, departmentAPI, kioskAPI } from '../lib/api';
 import TicketReceipt from '../components/TicketReceipt';
 import TicketNumber from '../components/TicketNumber';
+import { useLiveRefresh } from '../lib/useLiveRefresh';
 
 const STEP = { WELCOME: 0, INFO: 1, DEPARTMENT: 2, CATEGORY: 3, DONE: 4 };
 
@@ -21,10 +22,16 @@ export default function Kiosk() {
 
   const fallbackRef = useRef(null);
 
-  useEffect(() => {
+  const loadBasics = () => {
     settingsAPI.getPublic().then(r => setSettings(r.data)).catch(() => {});
     departmentAPI.getAll().then(r => setDepartments(r.data)).catch(() => {});
-  }, []);
+    // a parent is looking at a department's services: keep that list current too
+    if (step === STEP.CATEGORY && selectedDept) {
+      departmentAPI.getCategories(selectedDept.department_id).then(r => setCategories(r.data)).catch(() => {});
+    }
+  };
+  useEffect(loadBasics, []);
+  useLiveRefresh(['departments_updated', 'settings_updated'], loadBasics);
 
   // Auto-print when ticket is created
   useEffect(() => {

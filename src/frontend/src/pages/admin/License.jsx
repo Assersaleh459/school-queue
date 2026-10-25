@@ -4,6 +4,7 @@ import { licenseAPI } from '../../lib/licenseClient';
 import { LicenseCard } from '../../components/LicenseNotice';
 import { fmtDate } from '../../lib/licenseFormat';
 import { toast } from '../../store/useToastStore';
+import { useLiveRefresh } from '../../lib/useLiveRefresh';
 import useAuthStore from '../../store/useAuthStore';
 
 // SQLite timestamps are UTC without a "Z"
@@ -36,6 +37,7 @@ export default function License() {
     const t = setInterval(load, 60 * 1000);
     return () => clearInterval(t);
   }, [load]);
+  useLiveRefresh(['license_updated'], load);
 
   const free = async (d) => {
     if (!confirm(`Free the slot used by "${d.name}"?\n\nAnyone using SchoolQ on it is signed out. It can sign in again later if a slot is free.`)) return;

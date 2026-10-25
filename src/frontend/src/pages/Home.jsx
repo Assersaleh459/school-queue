@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAuthStore from '../store/useAuthStore';
 import { settingsAPI, authAPI } from '../lib/api';
+import { useLiveRefresh } from '../lib/useLiveRefresh';
 
 const TILES = [
   {
@@ -96,11 +97,13 @@ export default function Home() {
   const [schoolName, setSchoolName] = useState('My School');
   const [pwModal, setPwModal]       = useState(false);
 
-  useEffect(() => {
+  const loadName = () => {
     settingsAPI.getPublic()
       .then(res => { if (res.data.school_name) setSchoolName(res.data.school_name); })
       .catch(() => {});
-  }, []);
+  };
+  useEffect(loadName, []);
+  useLiveRefresh(['settings_updated'], loadName);
 
   const visible = TILES.filter(t => {
     if (user?.allowed_pages) {

@@ -64,6 +64,7 @@ router.post('/departments', requireRole('super_admin'), rules.createDepartment, 
       'INSERT INTO departments (name, name_ar, code, color_code, display_order, is_active, room_number) VALUES (?, ?, ?, ?, ?, ?, ?)'
     ).run(name, name_ar || null, code.toUpperCase(), color_code || '#19224A', display_order || 99, is_active ? 1 : 0, room_number || null);
     log(req.user?.user_id, 'DEPT_CREATED', 'department', result.lastInsertRowid, { name, code });
+    req.io.emit('departments_updated');   // Reception, Kiosk, display and admin lists reload now
     res.json({ success: true, department_id: result.lastInsertRowid });
   } catch (error) {
     if (error.message.includes('UNIQUE')) return res.status(400).json({ error: 'Department code already exists' });
@@ -79,6 +80,7 @@ router.put('/departments/:id', requireRole('super_admin'), rules.updateDepartmen
       WHERE department_id=?
     `).run(name, name_ar || null, code?.toUpperCase(), color_code, display_order, is_active ? 1 : 0, room_number || null, req.params.id);
     log(req.user?.user_id, 'DEPT_UPDATED', 'department', parseInt(req.params.id), { name });
+    req.io.emit('departments_updated');
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Failed to update department' });
@@ -106,6 +108,7 @@ router.post('/users', requireRole('super_admin'), rules.createUser, checkValidat
       'INSERT INTO users (username, password_hash, full_name, role, department_id, is_active, allowed_pages) VALUES (?, ?, ?, ?, ?, ?, ?)'
     ).run(username, hash, full_name, role, department_id || null, is_active ? 1 : 0, pages);
     log(req.user?.user_id, 'USER_CREATED', 'user', result.lastInsertRowid, { username, role });
+    req.io.emit('users_updated');
     res.json({ success: true, user_id: result.lastInsertRowid });
   } catch (error) {
     if (error.message.includes('UNIQUE')) return res.status(400).json({ error: 'Username already taken' });
@@ -134,6 +137,7 @@ router.put('/users/:id', requireRole('super_admin'), rules.updateUser, checkVali
     if (is_active === 0 || is_active === false) {
       socketHandlers.forceLogout(parseInt(req.params.id));
     }
+    req.io.emit('users_updated');
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Failed to update user' });
@@ -148,6 +152,7 @@ router.delete('/users/:id', requireRole('super_admin'), (req, res) => {
   if (hasTickets) return res.status(409).json({ error: 'User has ticket history. Deactivate instead of deleting.' });
   db.prepare('DELETE FROM users WHERE user_id = ?').run(req.params.id);
   log(req.user?.user_id, 'USER_DELETED', 'user', parseInt(req.params.id), { username: target.username });
+  req.io.emit('users_updated');
   res.json({ success: true });
 });
 
@@ -165,6 +170,7 @@ router.post('/departments/:id/categories', requireRole('super_admin'), (req, res
   const result = db.prepare(
     'INSERT INTO service_categories (department_id, name, estimated_time_minutes, is_active) VALUES (?, ?, ?, ?)'
   ).run(req.params.id, name, estimated_time_minutes || 5, is_active ? 1 : 0);
+  req.io.emit('departments_updated');
   res.json({ success: true, category_id: result.lastInsertRowid });
 });
 
@@ -173,12 +179,14 @@ router.put('/departments/:id/categories/:catId', requireRole('super_admin'), (re
   db.prepare(
     'UPDATE service_categories SET name=?, estimated_time_minutes=?, is_active=? WHERE category_id=? AND department_id=?'
   ).run(name, estimated_time_minutes || 5, is_active ? 1 : 0, req.params.catId, req.params.id);
+  req.io.emit('departments_updated');
   res.json({ success: true });
 });
 
 router.delete('/departments/:id/categories/:catId', requireRole('super_admin'), (req, res) => {
   try {
     db.prepare('DELETE FROM service_categories WHERE category_id=? AND department_id=?').run(req.params.catId, req.params.id);
+    req.io.emit('departments_updated');
     res.json({ success: true });
   } catch {
     res.status(400).json({ error: 'Cannot delete — tickets exist for this service type. Deactivate it instead.' });
@@ -221,6 +229,7 @@ router.post('/import/users', requireRole('super_admin'), async (req, res) => {
     } catch { skipped++; }
   }
   log(req.user?.user_id, 'USERS_IMPORTED', 'user', null, { created, skipped });
+  req.io.emit('users_updated');
   res.json({ success: true, created, skipped });
 });
 

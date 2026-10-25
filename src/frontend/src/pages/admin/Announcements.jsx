@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { adminAPI, voiceAPI, settingsAPI } from '../../lib/api';
 import { toast } from '../../store/useToastStore';
+import { useLiveRefresh } from '../../lib/useLiveRefresh';
 import { announcementTexts, clipKey, phraseUrl, unrecordedTexts } from '../../lib/voiceClips';
 
 const EMPTY = { message_text: '', message_text_ar: '', speak_language: 'en', display_order: '', is_active: true };
@@ -72,6 +73,10 @@ export default function Announcements({ announceOnly = false }) {
 
   const loadVoice = () => loadRecordedVoice().then(v => { setRecorded(v); return v; }).catch(() => null);
   useEffect(() => { load(); loadVoice(); }, []);
+
+  // Recordings finish in the background and the list can change on another screen: reload when
+  // the server says so (one reload per burst of finished clips) and when it comes back
+  useLiveRefresh(['voice_updated', 'announcements_updated', 'settings_updated'], () => { load(); loadVoice(); });
   const notRecorded = (a, v = recorded) => !!v && unrecordedTexts(a, v.manifest).length > 0;
 
   const load = () => adminAPI.getAnnouncements().then(r => setAnnouncements(r.data)).catch(() => {});

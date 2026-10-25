@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { adminAPI } from '../../lib/api';
 import { toast } from '../../store/useToastStore';
+import { useLiveRefresh } from '../../lib/useLiveRefresh';
 
 const ROLES = ['staff', 'admin', 'super_admin'];
 const REPORT_SUB_KEYS = ['reports_daily', 'reports_service_types', 'reports_transfers', 'reports_purposes', 'reports_ticket_log'];
@@ -38,10 +39,12 @@ export default function Users() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const importRef = useRef();
 
-  useEffect(() => {
+  const loadAll = () => {
     loadUsers();
     adminAPI.getDepartments().then(r => setDepartments(r.data)).catch(() => {});
-  }, []);
+  };
+  useEffect(loadAll, []);
+  useLiveRefresh(['users_updated', 'departments_updated'], loadAll);
 
   const loadUsers = () => adminAPI.getUsers().then(r => setUsers(r.data)).catch(() => {});
 

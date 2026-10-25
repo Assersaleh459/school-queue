@@ -60,10 +60,10 @@ export function useSocket(departmentId, onQueueUpdate, onSettingsUpdated) {
 //   ticket_called, ticket_recalled   — announce a call
 //   announcement_spoken              — admin pressed "Announce on display"
 //   queue_updated                    — a ticket changed → refresh the board now
-//   settings_updated, voice_updated, announcements_updated — reload that data now
+//   settings_updated, voice_updated, announcements_updated, departments_updated — reload that data now
 // Handlers live in a ref, so the socket connects once and always calls the latest ones.
 const MONITOR_EVENTS = ['ticket_called', 'ticket_recalled', 'announcement_spoken', 'queue_updated',
-  'settings_updated', 'voice_updated', 'announcements_updated'];
+  'settings_updated', 'voice_updated', 'announcements_updated', 'departments_updated'];
 
 export function useMonitorSocket(handlers) {
   const ref = useRef(handlers);

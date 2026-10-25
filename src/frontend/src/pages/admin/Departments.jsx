@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { adminAPI, reportsAPI } from '../../lib/api';
+import { useLiveRefresh } from '../../lib/useLiveRefresh';
 
 const DEPT_EMPTY = { name: '', name_ar: '', code: '', color_code: '#19224A', display_order: '', is_active: true, room_number: '' };
 const CAT_EMPTY  = { name: '', estimated_time_minutes: 5, is_active: true };
@@ -24,6 +25,11 @@ export default function Departments() {
   useEffect(() => { load(); }, []);
 
   const load = () => adminAPI.getDepartments().then(r => setDepartments(r.data)).catch(() => {});
+  // changed on another PC: refresh the lists (the open forms keep what is typed in them)
+  useLiveRefresh(['departments_updated'], () => {
+    load();
+    if (catDept) adminAPI.getCategories(catDept.department_id).then(r => setCategories(r.data)).catch(() => {});
+  });
   const set  = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const setcf = (k, v) => setCatForm(f => ({ ...f, [k]: v }));
 

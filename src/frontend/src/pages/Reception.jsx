@@ -4,6 +4,7 @@ import { departmentAPI, ticketAPI, settingsAPI } from '../lib/api';
 import useAuthStore from '../store/useAuthStore';
 import TicketReceipt from '../components/TicketReceipt';
 import { toast } from '../store/useToastStore';
+import { useLiveRefresh } from '../lib/useLiveRefresh';
 
 export default function Reception() {
   const [departments, setDepartments]     = useState([]);
@@ -29,7 +30,7 @@ export default function Reception() {
   const logout = useAuthStore(state => state.logout);
   const navigate = useNavigate();
 
-  useEffect(() => {
+  const loadBasics = () => {
     departmentAPI.getAll().then(r => setDepartments(r.data)).catch(() => {});
     settingsAPI.getPublic()
       .then(res => {
@@ -37,7 +38,17 @@ export default function Reception() {
         setTicketSettings(res.data);
       })
       .catch(() => {});
-  }, []);
+  };
+  useEffect(loadBasics, []);
+
+  const loadDeptData = (deptId) => {
+    departmentAPI.getCategories(deptId)
+      .then(r => setCategories(r.data)).catch(() => {});
+    departmentAPI.getQueue(deptId).then(r => {
+      setWaitingCount(r.data.length);
+      setQueuePosition(r.data.length + 1);
+    }).catch(() => {});
+  };
 
   // When department changes — load categories + queue count
   useEffect(() => {
@@ -48,13 +59,14 @@ export default function Reception() {
       setWaitEstimate(null);
       return;
     }
-    departmentAPI.getCategories(formData.department_id)
-      .then(r => setCategories(r.data)).catch(() => {});
-    departmentAPI.getQueue(formData.department_id).then(r => {
-      setWaitingCount(r.data.length);
-      setQueuePosition(r.data.length + 1);
-    }).catch(() => {});
+    loadDeptData(formData.department_id);
   }, [formData.department_id]);
+
+  // Departments, services, settings or the queue changed elsewhere: refresh the lists (not the form)
+  useLiveRefresh(['departments_updated', 'settings_updated', 'queue_updated'], () => {
+    loadBasics();
+    if (formData.department_id) loadDeptData(formData.department_id);
+  });
 
   // Recalculate estimate when category selection, categories list, or waitingCount changes
   useEffect(() => {

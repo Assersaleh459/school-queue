@@ -6,7 +6,7 @@
     "buildResources": "electron"
   },
   "extraMetadata": {
-    "version": "1.17.1"
+    "version": "1.17.3"
   },
   "extraResources": [
     {

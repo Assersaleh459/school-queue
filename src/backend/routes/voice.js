@@ -285,6 +285,8 @@ router.post('/wipe', [authMiddleware, requireRole('super_admin'), (req, res, nex
   req.io.emit('settings_updated');
   req.io.emit('voice_updated');
   req.io.emit('announcements_updated');
+  req.io.emit('departments_updated');
+  req.io.emit('users_updated');
   req.io.emit('queue_updated');
 });
 
@@ -352,6 +354,7 @@ router.post('/import/:id', admin, (req, res) => {
     req.io.emit('voice_updated');
     req.io.emit('settings_updated');
     req.io.emit('announcements_updated');
+    req.io.emit('departments_updated');
     log(req.user.user_id, 'VOICES_IMPORTED', 'voice', null, { voices: done, setup: added });
     res.json({ success: true, imported: done, setup: added });
   } catch (err) {

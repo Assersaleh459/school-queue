@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api, { departmentAPI, reportsAPI } from '../lib/api';
 import { toast } from '../store/useToastStore';
+import { useLiveRefresh } from '../lib/useLiveRefresh';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
@@ -191,9 +192,9 @@ function ServiceTypeReport() {
   const [reportData, setReportData]   = useState(null);
   const [loading, setLoading]         = useState(false);
 
-  useEffect(() => {
-    departmentAPI.getAll().then(r => setDepartments(r.data)).catch(() => {});
-  }, []);
+  const loadDepartments = () => departmentAPI.getAll().then(r => setDepartments(r.data)).catch(() => {});
+  useEffect(() => { loadDepartments(); }, []);
+  useLiveRefresh(['departments_updated'], loadDepartments);
 
   const fetchReport = async () => {
     setLoading(true);
@@ -400,9 +401,9 @@ function TransferReport() {
   const [data, setData]               = useState(null);
   const [loading, setLoading]         = useState(false);
 
-  useEffect(() => {
-    departmentAPI.getAll().then(r => setDepartments(r.data)).catch(() => {});
-  }, []);
+  const loadDepartments = () => departmentAPI.getAll().then(r => setDepartments(r.data)).catch(() => {});
+  useEffect(() => { loadDepartments(); }, []);
+  useLiveRefresh(['departments_updated'], loadDepartments);
 
   const fetchReport = async () => {
     setLoading(true);
@@ -537,9 +538,9 @@ function PurposeReport() {
   const [data, setData]               = useState(null);
   const [loading, setLoading]         = useState(false);
 
-  useEffect(() => {
-    departmentAPI.getAll().then(r => setDepartments(r.data)).catch(() => {});
-  }, []);
+  const loadDepartments = () => departmentAPI.getAll().then(r => setDepartments(r.data)).catch(() => {});
+  useEffect(() => { loadDepartments(); }, []);
+  useLiveRefresh(['departments_updated'], loadDepartments);
 
   const fetchReport = async () => {
     setLoading(true);
@@ -689,9 +690,9 @@ function TicketLog() {
   const [data, setData]               = useState(null);
   const [loading, setLoading]         = useState(false);
 
-  useEffect(() => {
-    departmentAPI.getAll().then(r => setDepartments(r.data)).catch(() => {});
-  }, []);
+  const loadDepartments = () => departmentAPI.getAll().then(r => setDepartments(r.data)).catch(() => {});
+  useEffect(() => { loadDepartments(); }, []);
+  useLiveRefresh(['departments_updated'], loadDepartments);
 
   const fetchReport = async () => {
     setLoading(true);

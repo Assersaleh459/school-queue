@@ -8,6 +8,7 @@ import { clipUrls, clipId } from '../../lib/voiceBrowse';
 import { useVoiceLock } from '../../lib/voiceLock';
 import VoiceUnlock from '../../components/VoiceUnlock';
 import VoicePack from './VoicePack';
+import { useLiveRefresh } from '../../lib/useLiveRefresh';
 
 const GROUPS = [
   { source: 'template',     title: 'Ticket calls',  hint: 'Fixed words from your call templates (Settings)' },
@@ -109,6 +110,10 @@ function VoiceRecordings() {
     const t = setInterval(loadEngine, 3000);
     return () => clearInterval(t);
   }, [loadPieces, loadEngine, loadVoices]);
+
+  // Departments, announcements or call wording changed on another screen: the list of pieces changes.
+  // (Finished clips are followed by the engine check above.)
+  useLiveRefresh(['departments_updated', 'announcements_updated', 'settings_updated'], () => { loadPieces().catch(() => {}); });
 
   // Calls (templates, departments, own phrases) use the calls voice; announcements their own
   const callsVoice    = manifest.voice || 'Sarah';

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { departmentAPI, queueAPI, settingsAPI } from '../lib/api';
 import useAuthStore from '../store/useAuthStore';
@@ -43,15 +43,22 @@ export default function QueueDashboard() {
   const navigate     = useNavigate();
   const departmentId = user?.department_id;
 
+  const fetchSeq = useRef(0);
+
   const fetchQueue = useCallback(async () => {
     if (!departmentId) return;
+    const seq = ++fetchSeq.current;
     try {
-      const [queueRes, statsRes] = await Promise.all([
+      const [queueRes, statsRes, currentRes] = await Promise.all([
         departmentAPI.getQueue(departmentId),
-        departmentAPI.getStats(departmentId)
+        departmentAPI.getStats(departmentId),
+        queueAPI.getCurrent(departmentId).catch(() => null)
       ]);
+      if (seq !== fetchSeq.current) return;   // a newer refresh is already on its way
       setQueue(queueRes.data);
       setStats(statsRes.data);
+      // "now serving" follows the server too: this department may be worked from another screen or PC
+      if (currentRes) setCurrentTicket(currentRes.data.ticket || null);
     } catch (err) {
       console.error('Failed to fetch queue:', err);
     } finally {
@@ -62,9 +69,6 @@ export default function QueueDashboard() {
   useEffect(() => {
     if (!departmentId) return;
     fetchQueue();
-    queueAPI.getCurrent(departmentId)
-      .then(res => { if (res.data.ticket) setCurrentTicket(res.data.ticket); })
-      .catch(() => {});
     departmentAPI.getAll()
       .then(res => setAllDepts(res.data.filter(d => d.department_id !== departmentId)))
       .catch(() => {});

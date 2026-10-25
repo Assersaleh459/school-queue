@@ -1,5 +1,5 @@
 {"name": "school-queue",
-  "version": "1.17.1",
+  "version": "1.17.3",
   "description": "Queue management system for schools",
   "author": "Vyra Systems <asserhegazy@vyra-systems.com>",
   "main": "electron/main.js",

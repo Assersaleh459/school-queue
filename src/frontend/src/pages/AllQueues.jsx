@@ -86,6 +86,7 @@ export default function AllQueues() {
     });
     socketRef.current = socket;
     socket.on('queue_updated', fetchAll);
+    socket.on('departments_updated', fetchAll);   // new departments get their rooms joined by the effect below
     socket.on('settings_updated', () => {
       settingsAPI.getPublic().then(res => {
         setTicketSettings(res.data);

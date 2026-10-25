@@ -4,6 +4,7 @@ import { departmentAPI, queueAPI, settingsAPI } from '../../lib/api';
 import useAuthStore from '../../store/useAuthStore';
 import { toast } from '../../store/useToastStore';
 import { onReconnect } from '../../lib/serverLink';
+import { useLiveRefresh } from '../../lib/useLiveRefresh';
 
 const PRIORITY_COLORS = {
   urgent:  'bg-red-100 text-red-800',
@@ -80,6 +81,17 @@ export default function QueueControl() {
 
     return () => { offReconnect(); socketRef.current?.disconnect(); };
   }, [loadAll]);
+
+  // A department was added or changed elsewhere: new list, join its room, reload
+  useLiveRefresh(['departments_updated'], () => {
+    departmentAPI.getAll().then(res => {
+      deptsRef.current = res.data;
+      setDepartments(res.data);
+      const socket = socketRef.current;
+      if (socket?.connected) res.data.forEach(d => socket.emit('join_department', d.department_id));
+      loadAll(res.data);
+    }).catch(() => {});
+  });
 
   // ── Actions ───────────────────────────────────────────────────────────────────
 

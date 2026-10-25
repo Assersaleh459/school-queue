@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { useMonitorSocket } from '../lib/useSocket';
+import TicketNumber from '../components/TicketNumber';
 import { DEFAULT_TEMPLATES, buildPlan, announcementTexts, clipKey, phraseUrl } from '../lib/voiceClips';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -241,6 +242,7 @@ export default function PublicDisplay() {
     settings_updated: loadSettings,
     voice_updated: loadVoice,
     announcements_updated: fetchAnnouncements,
+    departments_updated: fetchDisplayData,
   });
 
   useEffect(() => {
@@ -282,7 +284,9 @@ export default function PublicDisplay() {
   }).join('   •   ');
 
   const n    = departments.length;
-  const cols = n <= 1 ? 1 : n === 2 ? 2 : n === 4 ? 2 : 3;
+  // More departments -> more columns, so every card keeps enough height (max 3 rows).
+  const cols = n <= 1 ? 1 : n === 2 ? 2 : n === 4 ? 2 : n <= 6 ? 3 : n <= 12 ? 4 : 5;
+  const rows = Math.max(1, Math.ceil(n / cols));
 
   return (
     <div className="h-screen flex flex-col bg-gray-100 overflow-hidden select-none">
@@ -311,7 +315,7 @@ export default function PublicDisplay() {
 
       <main
         className="flex-1 grid gap-4 p-4 overflow-hidden min-h-0"
-        style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
+        style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))` }}
       >
         {departments.map(dept => {
           const data  = displayData[dept.department_id] || {};
@@ -329,16 +333,18 @@ export default function PublicDisplay() {
                 <p className="text-gray-400 text-sm font-semibold">{dept.code}</p>
               </div>
 
-              <div className="flex-1 flex flex-col items-center justify-center px-4 py-4 gap-3 min-h-0">
+              <div className="flex-1 flex flex-col items-center justify-center px-4 py-4 gap-3 min-h-0 overflow-hidden">
                 <p className="text-base text-gray-400 uppercase tracking-widest font-semibold">Now Serving</p>
                 {data.current ? (
                   <>
-                    <p
-                      className="font-black tracking-wider text-center leading-none"
-                      style={{ color, fontSize: cols <= 2 ? '3.5rem' : '2.5rem', wordBreak: 'break-all' }}
-                    >
-                      {data.current.ticket_number}
-                    </p>
+                    <div className="w-full" style={{ color }}>
+                      <TicketNumber
+                        value={data.current.ticket_number}
+                        maxSize={cols <= 2 ? '3.5rem' : '2.5rem'}
+                        spacing={0.05}
+                        className="font-black text-center"
+                      />
+                    </div>
                     <p className="text-xl text-gray-500 font-semibold">{data.counter}</p>
                   </>
                 ) : (
@@ -352,7 +358,7 @@ export default function PublicDisplay() {
               >
                 <div className="text-center">
                   <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-0.5">Next</p>
-                  <p className="text-lg font-bold text-gray-700">{data.next?.ticket_number || '—'}</p>
+                  <p className="text-lg font-bold text-gray-700 whitespace-nowrap">{data.next?.ticket_number || '—'}</p>
                 </div>
                 <div className="text-center">
                   <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-0.5">Waiting</p>
