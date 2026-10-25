@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
+import { onReconnect } from './serverLink';
 
 let socket;
 
@@ -40,7 +41,14 @@ export function useSocket(departmentId, onQueueUpdate, onSettingsUpdated) {
       console.error('Socket connection error:', error);
     });
 
+    // The server was away: the queue may have changed without us hearing about it
+    const offReconnect = onReconnect(() => {
+      onQueueUpdate();
+      if (onSettingsUpdated) onSettingsUpdated();
+    });
+
     return () => {
+      offReconnect();
       socket.disconnect();
     };
   }, [departmentId, onQueueUpdate, onSettingsUpdated]);

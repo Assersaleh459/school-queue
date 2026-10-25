@@ -1,11 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../database/db');
-const { authMiddleware, requireRole } = require('../middleware/auth');
+const { authMiddleware, requirePageAccess } = require('../middleware/auth');
 
-router.use(authMiddleware, requireRole('super_admin', 'admin'));
+// Admins see every report. Other users need the matching report tab ticked in Admin → Users.
+router.use(authMiddleware);
+const tab = (key) => requirePageAccess(key, 'super_admin', 'admin');
 
-router.get('/daily', (req, res) => {
+router.get('/daily', tab('reports_daily'), (req, res) => {
   const date = req.query.date || new Date().toISOString().split('T')[0];
   try {
     const report = db.prepare(`
@@ -34,7 +36,7 @@ router.get('/daily', (req, res) => {
   }
 });
 
-router.get('/service-types', (req, res) => {
+router.get('/service-types', tab('reports_service_types'), (req, res) => {
   const { from, to, department_id } = req.query;
   const fromDate = from || new Date().toISOString().split('T')[0];
   const toDate   = to   || fromDate;
@@ -73,7 +75,7 @@ router.get('/service-types', (req, res) => {
   }
 });
 
-router.get('/category-stats', (req, res) => {
+router.get('/category-stats', tab('reports_service_types'), (req, res) => {
   try {
     const stats = db.prepare(`
       SELECT
@@ -98,7 +100,7 @@ router.get('/category-stats', (req, res) => {
   }
 });
 
-router.get('/transfers', (req, res) => {
+router.get('/transfers', tab('reports_transfers'), (req, res) => {
   const { from, to, dept_id } = req.query;
   const fromDate = from || new Date().toISOString().split('T')[0];
   const toDate   = to   || fromDate;
@@ -131,7 +133,7 @@ router.get('/transfers', (req, res) => {
   }
 });
 
-router.get('/ticket-log', (req, res) => {
+router.get('/ticket-log', tab('reports_ticket_log'), (req, res) => {
   const { from, to, dept_id, status, search } = req.query;
   const fromDate = from || new Date().toISOString().split('T')[0];
   const toDate   = to   || fromDate;
@@ -187,7 +189,7 @@ router.get('/ticket-log', (req, res) => {
   }
 });
 
-router.get('/purposes', (req, res) => {
+router.get('/purposes', tab('reports_purposes'), (req, res) => {
   const { from, to, dept_id } = req.query;
   const fromDate = from || new Date().toISOString().split('T')[0];
   const toDate   = to   || fromDate;

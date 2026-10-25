@@ -111,10 +111,12 @@ app.get('/api/settings/public', (req, res) => {
     'ticket_paper', 'ticket_footer', 'ticket_number_size',
     'ticket_show_parent', 'ticket_show_student', 'ticket_show_time', 'ticket_show_wait',
   ];
+  // Same defaults the Settings page shows, so an install that never saved them still gets the alert
+  const defaults = { max_wait_alert_minutes: '30', no_show_after_calls: '3' };
   const result = {};
   keys.forEach(k => {
     const row = db.prepare('SELECT setting_value FROM settings WHERE setting_key = ?').get(k);
-    result[k] = row?.setting_value || null;
+    result[k] = row?.setting_value || defaults[k] || null;
   });
   res.json(result);
 });

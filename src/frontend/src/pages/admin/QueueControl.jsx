@@ -3,6 +3,7 @@ import { io } from 'socket.io-client';
 import { departmentAPI, queueAPI, settingsAPI } from '../../lib/api';
 import useAuthStore from '../../store/useAuthStore';
 import { toast } from '../../store/useToastStore';
+import { onReconnect } from '../../lib/serverLink';
 
 const PRIORITY_COLORS = {
   urgent:  'bg-red-100 text-red-800',
@@ -75,7 +76,9 @@ export default function QueueControl() {
       .then(r => { if (r.data.no_show_after_calls) setNoShowLimit(parseInt(r.data.no_show_after_calls)); })
       .catch(() => {});
 
-    return () => socketRef.current?.disconnect();
+    const offReconnect = onReconnect(() => loadAll(deptsRef.current));
+
+    return () => { offReconnect(); socketRef.current?.disconnect(); };
   }, [loadAll]);
 
   // ── Actions ───────────────────────────────────────────────────────────────────

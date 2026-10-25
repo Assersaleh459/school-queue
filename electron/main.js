@@ -192,6 +192,17 @@ ipcMain.handle('restore-database', async () => {
 ipcMain.handle('test-server', (e, ip, port) => testServer(ip, port));
 ipcMain.handle('discover-servers', () => discoverServers());
 
+// Staff app, server went away: is it back (maybe on another port)? Returns its URL or null.
+ipcMain.handle('find-server', async () => {
+  const cfg = getConfig();
+  if (!cfg || cfg.mode === 'server' || getBuildMode() === 'server') return null;
+  const url = await findServer(cfg.serverUrl, 4000);
+  let saved = null;
+  try { saved = new URL(cfg.serverUrl).origin; } catch {}
+  if (url && url !== saved) saveConfig({ ...cfg, serverUrl: url });
+  return url;
+});
+
 // ── Network helpers ───────────────────────────────────────────────────────────
 
 function isPortListening(port, host = '127.0.0.1') {
@@ -260,7 +271,15 @@ function waitForActualServer(timeoutMs = 30000) {
 
 // ── Window ────────────────────────────────────────────────────────────────────
 
-function createWindow(url) {
+// True once the app is really quitting (menu, error, Windows shutdown, or the user said "Stop").
+// The Server window's close button asks first, but must never block a real quit.
+let quitting = false;
+app.on('before-quit', () => { quitting = true; });
+
+// reconnectOnFail: Staff window on a remote server. If the page can't load (server off or
+// moved), show the "looking for the server" page instead of Chromium's error page.
+// confirmClose: Server window. Closing it stops the server for the whole school, so ask first.
+function createWindow(url, { reconnectOnFail = false, confirmClose = false } = {}) {
   mainWindow = new BrowserWindow({
     width: 1280, height: 800,
     minWidth: 1024, minHeight: 600,
@@ -275,6 +294,40 @@ function createWindow(url) {
     },
     show: false,
   });
+
+  if (reconnectOnFail) {
+    mainWindow.webContents.on('did-fail-load', (e, code, desc, failedUrl, isMainFrame) => {
+      if (!isMainFrame || code === -3 || !/^https?:/.test(failedUrl)) return;   // -3 = load cancelled
+      mainWindow.loadFile(path.join(__dirname, 'reconnect.html'));
+      if (!mainWindow.isVisible()) mainWindow.show();
+    });
+  }
+
+  if (confirmClose) {
+    let asking = false;
+    mainWindow.on('session-end', () => { quitting = true; });   // Windows is shutting down
+    mainWindow.on('close', (e) => {
+      if (quitting) return;
+      e.preventDefault();
+      if (asking) return;
+      asking = true;
+      const win = mainWindow;
+      dialog.showMessageBox(win, {
+        type: 'warning',
+        buttons: ['Keep the server running', 'Minimize', 'Stop the server'],
+        defaultId: 0,
+        cancelId: 0,
+        noLink: true,
+        title: 'SchoolQ Server',
+        message: 'Stop the SchoolQ server?',
+        detail: 'Closing this window stops the server. All Staff, Kiosk and TV Display screens will lose their connection until you start SchoolQ Server again.\n\nTo keep the school running, choose "Minimize".',
+      }).then(({ response }) => {
+        asking = false;
+        if (response === 1) { if (win && !win.isDestroyed()) win.minimize(); }
+        else if (response === 2) { quitting = true; app.quit(); }
+      });
+    });
+  }
 
   mainWindow.loadURL(url);
   mainWindow.once('ready-to-show', () => mainWindow.show());
@@ -319,7 +372,7 @@ app.on('ready', async () => {
     if (buildMode === 'server') {
       await startLocalServer();
       const port = await waitForActualServer(30000);
-      createWindow(`http://localhost:${port}`);
+      createWindow(`http://localhost:${port}`, { confirmClose: true });
       return;
     }
 
@@ -331,13 +384,13 @@ app.on('ready', async () => {
     if (config.mode === 'server') {
       await startLocalServer();
       const port = await waitForActualServer(30000);
-      createWindow(`http://localhost:${port}`);
+      createWindow(`http://localhost:${port}`, { confirmClose: true });
     } else {
       const serverUrl = await findServer(config.serverUrl, 20000);
       if (serverUrl) {
         // Found it somewhere else (e.g. moved port) — remember the new address.
         if (serverUrl !== config.serverUrl) saveConfig({ ...config, serverUrl });
-        createWindow(serverUrl);
+        createWindow(serverUrl, { reconnectOnFail: true });
       } else {
         dialog.showErrorBox(
           'Cannot Connect to Server',

@@ -73,7 +73,7 @@ export default function License() {
   const full = allowed && used >= allowed;
 
   return (
-    <div className="max-w-4xl">
+    <div className="max-w-7xl">
       <h2 className="text-2xl font-bold text-navy mb-1">License</h2>
       <p className="text-sm text-gray-500 mb-6">Your SchoolQ license, the Staff devices using it, and renewals.</p>
 

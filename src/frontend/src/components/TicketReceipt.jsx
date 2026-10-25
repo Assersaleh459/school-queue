@@ -1,3 +1,5 @@
+import TicketNumber from './TicketNumber';
+
 export default function TicketReceipt({ ticket, schoolName = 'My School', ticketSettings = {}, closeLabel = 'CREATE ANOTHER TICKET', onClose }) {
   const handlePrint = () => window.print();
 
@@ -5,12 +7,13 @@ export default function TicketReceipt({ ticket, schoolName = 'My School', ticket
   const isThermal = ticketSettings.ticket_paper === 'thermal';
   const footer = ticketSettings.ticket_footer ||
     'Please wait in the reception area.\nYour number will appear on the screen.';
-  const numberSizeClass = {
-    xs:    'text-3xl',
-    sm:    'text-4xl',
-    large: 'text-8xl',
-    xl:    'text-9xl',
-  }[ticketSettings.ticket_number_size] || 'text-6xl';
+  // The number is fitted to the width on one line; this is the biggest it may get
+  const numberMaxSize = {
+    xs:    '1.875rem',
+    sm:    '2.25rem',
+    large: '6rem',
+    xl:    '8rem',
+  }[ticketSettings.ticket_number_size] || '3.75rem';
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
@@ -20,11 +23,11 @@ export default function TicketReceipt({ ticket, schoolName = 'My School', ticket
 
       <div className={`bg-white rounded-lg shadow-lg p-8 ${isThermal ? 'max-w-xs' : 'max-w-md'} w-full`}>
         <div className="print-area text-center">
-          <h1 className="text-3xl font-bold text-navy mb-2">{schoolName.toUpperCase()}</h1>
+          <h1 className="text-3xl font-bold text-navy mb-2 break-words">{schoolName.toUpperCase()}</h1>
           <p className="text-gray-600 mb-6">Queue Ticket</p>
 
           <div className="border-t-2 border-b-2 border-navy py-6 my-6">
-            <p className={`${numberSizeClass} font-bold text-teal mb-4`}>{ticket.ticket_number}</p>
+            <TicketNumber value={ticket.ticket_number} maxSize={numberMaxSize} className="font-bold text-teal mb-4" />
           </div>
 
           <div className="text-left space-y-2 mb-6">
@@ -37,7 +40,7 @@ export default function TicketReceipt({ ticket, schoolName = 'My School', ticket
             {show('ticket_show_time') && (
               <p className="text-lg"><span className="font-semibold">Time:</span> {new Date(ticket.created_at + 'Z').toLocaleTimeString()}</p>
             )}
-            {show('ticket_show_wait') && ticket.estimated_wait && (
+            {show('ticket_show_wait') && ticket.estimated_wait > 0 && (
               <p className="text-lg"><span className="font-semibold">Est. Wait:</span> {ticket.estimated_wait} minutes</p>
             )}
           </div>

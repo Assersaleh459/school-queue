@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import api, { adminAPI, reportsAPI } from '../lib/api';
+import api, { departmentAPI, reportsAPI } from '../lib/api';
 import { toast } from '../store/useToastStore';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -192,7 +192,7 @@ function ServiceTypeReport() {
   const [loading, setLoading]         = useState(false);
 
   useEffect(() => {
-    adminAPI.getDepartments().then(r => setDepartments(r.data)).catch(() => {});
+    departmentAPI.getAll().then(r => setDepartments(r.data)).catch(() => {});
   }, []);
 
   const fetchReport = async () => {
@@ -401,7 +401,7 @@ function TransferReport() {
   const [loading, setLoading]         = useState(false);
 
   useEffect(() => {
-    adminAPI.getDepartments().then(r => setDepartments(r.data)).catch(() => {});
+    departmentAPI.getAll().then(r => setDepartments(r.data)).catch(() => {});
   }, []);
 
   const fetchReport = async () => {
@@ -538,7 +538,7 @@ function PurposeReport() {
   const [loading, setLoading]         = useState(false);
 
   useEffect(() => {
-    adminAPI.getDepartments().then(r => setDepartments(r.data)).catch(() => {});
+    departmentAPI.getAll().then(r => setDepartments(r.data)).catch(() => {});
   }, []);
 
   const fetchReport = async () => {
@@ -690,7 +690,7 @@ function TicketLog() {
   const [loading, setLoading]         = useState(false);
 
   useEffect(() => {
-    adminAPI.getDepartments().then(r => setDepartments(r.data)).catch(() => {});
+    departmentAPI.getAll().then(r => setDepartments(r.data)).catch(() => {});
   }, []);
 
   const fetchReport = async () => {

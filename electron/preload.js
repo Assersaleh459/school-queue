@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   relaunch:     ()       => ipcRenderer.send('relaunch'),
   testServer:      (ip, port) => ipcRenderer.invoke('test-server', ip, port),
   discoverServers: ()         => ipcRenderer.invoke('discover-servers'),
+  findServer:      ()         => ipcRenderer.invoke('find-server'),     // Staff app: saved server, else search the LAN → URL or null
   mediaPause:      ()         => ipcRenderer.invoke('media-pause'),    // → { paused: n }
   mediaResume:     ()         => ipcRenderer.invoke('media-resume'),
   showBanner:      (data)     => ipcRenderer.send('banner-show', data),

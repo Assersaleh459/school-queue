@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../database/db');
-const { authMiddleware, requirePageAccess } = require('../middleware/auth');
+const { authMiddleware, requireRole, requirePageAccess } = require('../middleware/auth');
 const { rules, checkValidation } = require('../middleware/validate');
 const { log } = require('../audit');
 
@@ -19,6 +19,8 @@ router.get('/', (req, res) => {
 });
 
 // Management — requires the 'announcements' screen grant (or admin role)
+// Add / edit / delete: admins only. Staff with the screen can list and announce (voice.js) but not change the list.
+const canEdit = [authMiddleware, requireRole('super_admin', 'admin')];
 const canManage = [authMiddleware, requirePageAccess('announcements', 'super_admin', 'admin')];
 
 router.get('/all', canManage, (req, res) => {
@@ -26,7 +28,7 @@ router.get('/all', canManage, (req, res) => {
   res.json(rows);
 });
 
-router.post('/', canManage, rules.createAnnouncement, checkValidation, (req, res) => {
+router.post('/', canEdit, rules.createAnnouncement, checkValidation, (req, res) => {
   const { message_text, message_text_ar, speak_language, display_order, is_active } = req.body;
   const result = db.prepare(
     'INSERT INTO announcements (message_text, message_text_ar, speak_language, display_order, is_active) VALUES (?, ?, ?, ?, ?)'
@@ -36,7 +38,7 @@ router.post('/', canManage, rules.createAnnouncement, checkValidation, (req, res
   res.json({ success: true, announcement_id: result.lastInsertRowid });
 });
 
-router.put('/:id', canManage, rules.updateAnnouncement, checkValidation, (req, res) => {
+router.put('/:id', canEdit, rules.updateAnnouncement, checkValidation, (req, res) => {
   const { message_text, message_text_ar, speak_language, display_order, is_active } = req.body;
   db.prepare(
     'UPDATE announcements SET message_text=?, message_text_ar=?, speak_language=?, display_order=?, is_active=? WHERE announcement_id=?'
@@ -46,7 +48,7 @@ router.put('/:id', canManage, rules.updateAnnouncement, checkValidation, (req, r
   res.json({ success: true });
 });
 
-router.delete('/:id', canManage, (req, res) => {
+router.delete('/:id', canEdit, (req, res) => {
   db.prepare('DELETE FROM announcements WHERE announcement_id = ?').run(req.params.id);
   req.io.emit('announcements_updated');
   log(req.user?.user_id, 'ANNOUNCEMENT_DELETED', 'announcement', parseInt(req.params.id));

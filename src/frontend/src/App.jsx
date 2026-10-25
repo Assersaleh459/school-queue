@@ -7,6 +7,7 @@ import useAuthStore from './store/useAuthStore';
 import Toast from './components/Toast';
 import { LicenseBanner } from './components/LicenseNotice';
 import ForcePasswordChange from './components/ForcePasswordChange';
+import ServerStatusBanner from './components/ServerStatusBanner';
 
 // ── Lazy-loaded routes ────────────────────────────────────────────────────────
 const Login        = lazy(() => import('./pages/Login'));
@@ -101,6 +102,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <Toast />
+      <ServerStatusBanner />
       <LicenseBanner />
       <Suspense fallback={<PageLoader />}>
         <Routes>
@@ -162,7 +164,7 @@ export default function App() {
 
           <Route path="/announcements" element={
             <ProtectedRoute page="announcements" roles={['super_admin', 'admin']}>
-              <ScreenShell title="Announcements"><Announcements /></ScreenShell>
+              <ScreenShell title="Announcements"><Announcements announceOnly /></ScreenShell>
             </ProtectedRoute>
           } />
 

@@ -1688,6 +1688,76 @@ fileTable([
 ]);
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  v1.16.1 — REPORTS FOR NON-ADMINS, ANNOUNCE-ONLY HOME, MEDIA-PAUSE DIARY
+// ─────────────────────────────────────────────────────────────────────────────
+versionHeader({
+  version: '1.16.1', date: '20 Oct 2026', type: 'fix',
+  commit: 'this release',
+  summary: 'Reports for Non-Admin Users, Announce-Only Home, Media-Pause Diary, Wait Alert Fix',
+});
+bullet('Reports: each report route checks the user\'s own report tab (Daily, Ticket Log, ...) instead of admin role only');
+sub('The department filter uses the departments list a non-admin can see');
+bullet('Home > Announcements is announce-only: no Add / Edit / Delete / preview, only 📢 Announce (the Admin Panel copy is unchanged)');
+sub('Server side: only admins can add, edit or delete announcements');
+bullet('All Queues wait alert fixed: an install without a max_wait_alert_minutes row sent null, so the alert stayed off');
+sub('The server now falls back to 30 minutes (and 3 calls for no-show)');
+bullet('Media pause diary: %APPDATA%\\SchoolQ\\media-log.txt records each pause / resume with the result (200 KB cap)');
+sub('Resume is retried once after 0.8 s, and only runs after a real pause');
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  v1.16.2 — WIDE-SCREEN SETTINGS AND LICENSE
+// ─────────────────────────────────────────────────────────────────────────────
+versionHeader({
+  version: '1.16.2', date: '25 Oct 2026', type: 'ux',
+  commit: 'this release',
+  summary: 'Settings and License Use the Full Width of Wide Screens',
+});
+bullet('Settings and License were capped at 768 / 896 px and left the right half of a wide screen empty');
+sub('Both now go up to 1280 px; Settings shows two columns from 1280 px and one column below');
+bullet('Checked at 1920, 1366 and 900 px');
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  v1.16.3 — TICKET NUMBER FITS THE PAPER
+// ─────────────────────────────────────────────────────────────────────────────
+versionHeader({
+  version: '1.16.3', date: '25 Oct 2026', type: 'fix',
+  commit: 'this release',
+  summary: 'Long Ticket Numbers Fit on One Line, Printed and on Screen',
+});
+bullet('New TicketNumber component sizes a long number (e.g. STAG-20261025-001) to one line inside its box');
+sub('Uses CSS container units, so it also holds when printing; used by the Reception / printed ticket and the Kiosk done screen');
+bullet('Settings > ticket number size now sets only the maximum size');
+bullet('Fixed a stray 0 under Time on the ticket (estimated_wait > 0)');
+bullet('Checked: kiosk at 1920 and 1024 px, and an 80 mm print (PDF)');
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  v1.16.4 — WHAT STAFF SEE WHEN THE SERVER IS CLOSED
+// ─────────────────────────────────────────────────────────────────────────────
+versionHeader({
+  version: '1.16.4', date: '25 Oct 2026', type: 'ux',
+  commit: 'this release',
+  summary: 'Clear "Server Not Reachable" Notice and Automatic Reconnect for Staff',
+});
+bullet('Red bar on every screen (not the TV display) while the server cannot be reached');
+bullet('Queue Dashboard and Queue Control reload their data when the server comes back (before, the list stayed old until the next ticket event)');
+bullet('Staff app: if the page cannot load (server off at reload), a "Looking for the server" page retries and opens the app when it is back');
+sub('If the server came back on another port, the Staff window finds it on the network and moves there by itself');
+sub('"Choose a different server" button opens the setup screen');
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  v1.16.5 — ASK BEFORE THE SERVER WINDOW CLOSES
+// ─────────────────────────────────────────────────────────────────────────────
+versionHeader({
+  version: '1.16.5', date: '25 Oct 2026', type: 'ux',
+  commit: 'this release',
+  summary: 'Closing the Server Window Asks First',
+});
+bullet('Closing the SchoolQ Server window used to stop the server at once, cutting off every Staff, Kiosk and TV screen');
+sub('It now asks: "Keep the server running" (default), "Minimize", or "Stop the server"');
+sub('A real quit (error, Windows shutdown, restore, relaunch) is never blocked');
+sub('Staff windows are unchanged: closing one just closes that app');
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  SUMMARY PAGE
 // ─────────────────────────────────────────────────────────────────────────────
 newPage();
@@ -1739,6 +1809,11 @@ const timeline = [
   { v:'v1.12.0', date:'16 Oct 2026', type:'minor',    desc:'Licensing: Staff device limit, expiry alerts, License tab, generator app' },
   { v:'v1.13.0', date:'17 Oct 2026', type:'minor',    desc:'Vyra password for Voice Recordings, voices + engine as files, Settings fix' },
   { v:'v1.13.1', date:'17 Oct 2026', type:'patch',    desc:'Changed voice password takes effect at once; License Generator 1.1.0' },
+  { v:'v1.16.1', date:'20 Oct 2026', type:'fix',      desc:'Reports for non-admins, announce-only Home, wait alert fix, media-pause diary' },
+  { v:'v1.16.2', date:'25 Oct 2026', type:'ux',       desc:'Settings and License use the full width of wide screens' },
+  { v:'v1.16.3', date:'25 Oct 2026', type:'fix',      desc:'Long ticket numbers fit on one line, printed and on screen' },
+  { v:'v1.16.4', date:'25 Oct 2026', type:'ux',       desc:'Server-not-reachable bar, reload on reconnect, Staff finds a moved server' },
+  { v:'v1.16.5', date:'25 Oct 2026', type:'ux',       desc:'Closing the Server window asks first (keep / minimize / stop)' },
 ];
 const tc = { initial:C.navy, patch:C.green, security:C.red, fix:C.amber, minor:C.blue, ux:C.purple };
 timeline.forEach((r, i) => {

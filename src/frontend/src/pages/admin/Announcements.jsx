@@ -58,7 +58,9 @@ async function loadRecordedVoice() {
 
 const notRecordedHint = (voice) => `Not recorded in the ${voice} voice yet, so the display reads it with the online voice. Record it in Voice Recordings.`;
 
-export default function Announcements() {
+// announceOnly: the Home screen version (staff with the 'announcements' screen) can only announce.
+// The Admin Panel version keeps add / edit / delete / preview.
+export default function Announcements({ announceOnly = false }) {
   const [announcements, setAnnouncements] = useState([]);
   const [showForm, setShowForm]           = useState(false);
   const [editing, setEditing]             = useState(null);
@@ -139,18 +141,20 @@ export default function Announcements() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-navy">Announcements ({announcements.length})</h2>
-        <button
-          onClick={openCreate}
-          className="bg-teal text-white px-5 py-2 rounded-lg hover:bg-opacity-90 font-semibold"
-        >
-          + Add Announcement
-        </button>
+        {!announceOnly && (
+          <button
+            onClick={openCreate}
+            className="bg-teal text-white px-5 py-2 rounded-lg hover:bg-opacity-90 font-semibold"
+          >
+            + Add Announcement
+          </button>
+        )}
       </div>
 
       <div className="space-y-3">
         {announcements.length === 0 && (
           <div className="bg-white rounded-xl p-8 text-center text-gray-400">
-            No announcements yet. Add one to show it on the display monitor.
+            {announceOnly ? 'No announcements yet. Ask an administrator to add them.' : 'No announcements yet. Add one to show it on the display monitor.'}
           </div>
         )}
         {announcements.map(a => (
@@ -188,8 +192,9 @@ export default function Announcements() {
                 className="px-3 py-1 bg-navy text-white rounded text-sm hover:bg-opacity-80"
                 title="Announce on display now (recorded voice if available — see Voice Recordings)"
               >
-                📢
+                {announceOnly ? '📢 Announce' : '📢'}
               </button>
+              {!announceOnly && <>
               <button
                 onClick={() => preview(a)}
                 className="px-3 py-1 bg-teal text-white rounded text-sm hover:bg-opacity-80"
@@ -209,6 +214,7 @@ export default function Announcements() {
               >
                 Delete
               </button>
+              </>}
             </div>
           </div>
         ))}

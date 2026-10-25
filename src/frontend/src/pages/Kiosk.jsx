@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { settingsAPI, departmentAPI, kioskAPI } from '../lib/api';
 import TicketReceipt from '../components/TicketReceipt';
+import TicketNumber from '../components/TicketNumber';
 
 const STEP = { WELCOME: 0, INFO: 1, DEPARTMENT: 2, CATEGORY: 3, DONE: 4 };
 
@@ -254,11 +255,11 @@ export default function Kiosk() {
 
           {/* DONE */}
           {step === STEP.DONE && ticket && (
-            <div className="text-center w-full max-w-lg">
+            <div className="text-center w-full max-w-3xl">
               <div className="text-7xl mb-6">✅</div>
               <p className="text-white/60 text-2xl mb-3">Your ticket number is</p>
-              <div className="bg-white rounded-3xl p-10 mb-8 shadow-2xl">
-                <p className="text-8xl font-black text-navy tracking-widest">{ticket.ticket_number}</p>
+              <div className="bg-white rounded-3xl p-8 mb-8 shadow-2xl">
+                <TicketNumber value={ticket.ticket_number} maxSize="6rem" spacing={0.04} className="font-black text-navy" />
                 <p className="text-gray-500 mt-4 text-2xl font-semibold">{ticket.department_name}</p>
                 {ticket.estimated_wait > 0 && (
                   <p className="text-gray-400 mt-2 text-lg">Estimated wait: ~{ticket.estimated_wait} min</p>

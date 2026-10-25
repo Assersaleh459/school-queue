@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>SchoolQ</title>
+<style>
+  body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+         font-family: 'Segoe UI', Arial, sans-serif; background: #f3f4f6; color: #1f2937; }
+  .card { background: #fff; border-radius: 16px; padding: 40px 48px; max-width: 520px; text-align: center;
+          box-shadow: 0 4px 24px rgba(0,0,0,.08); }
+  h1 { margin: 0 0 8px; font-size: 22px; }
+  p { margin: 8px 0; color: #4b5563; line-height: 1.5; }
+  .dot { width: 14px; height: 14px; border-radius: 50%; background: #dc2626; margin: 0 auto 20px;
+         animation: pulse 1.2s infinite; }
+  @keyframes pulse { 50% { opacity: .25; } }
+  button { margin-top: 20px; padding: 10px 20px; border: 1px solid #d1d5db; border-radius: 8px;
+           background: #fff; font-size: 14px; cursor: pointer; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="dot"></div>
+    <h1>Cannot reach the SchoolQ server</h1>
+    <p>Looking for it on the network. This page will open the app by itself as soon as the server is back.</p>
+    <p id="status">Searching…</p>
+    <p>If the server PC is off, switch it on and start SchoolQ Server.</p>
+    <button id="change">Choose a different server</button>
+  </div>
+<script>
+  let tries = 0;
+  async function search() {
+    tries++;
+    document.getElementById('status').textContent = 'Searching… (try ' + tries + ')';
+    try {
+      const url = await window.electronAPI.findServer();
+      if (url) { location.href = url; return; }
+    } catch (e) { /* keep trying */ }
+    setTimeout(search, 1500);
+  }
+  document.getElementById('change').onclick = () => { location.href = 'setup.html'; };
+  search();
+</script>
+</body>
+</html>

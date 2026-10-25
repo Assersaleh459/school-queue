@@ -182,7 +182,7 @@ export default function Settings() {
   };
 
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-7xl">
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-3">
           <h2 className="text-2xl font-bold text-navy">System Settings</h2>
@@ -239,7 +239,7 @@ export default function Settings() {
         )}
       </section>
 
-      <form onSubmit={handleSave} className="space-y-6">
+      <form onSubmit={handleSave} className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
         {/* Branding */}
         <section className="bg-white rounded-xl shadow-sm p-6">
           <h3 className="text-lg font-bold text-navy mb-4 pb-2 border-b">School Branding</h3>
@@ -592,7 +592,7 @@ export default function Settings() {
         <button
           type="submit"
           disabled={saving}
-          className="w-full bg-teal text-white py-3 rounded-xl hover:bg-opacity-90 font-bold text-lg disabled:opacity-50 transition-all"
+          className="w-full xl:col-span-2 bg-teal text-white py-3 rounded-xl hover:bg-opacity-90 font-bold text-lg disabled:opacity-50 transition-all"
         >
           {saving ? 'Saving...' : saved ? 'Saved!' : 'Save All Settings'}
         </button>

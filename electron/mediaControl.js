@@ -34,7 +34,7 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
       foreach ($s in $sessions) {
         if ($held -contains $s.SourceAppUserModelId -and "$($s.GetPlaybackInfo().PlaybackStatus)" -eq 'Paused' -and (Await ($s.TryPlayAsync()) ([bool]))) { $n++ }
       }
-      $held = @()
+      if ($n -gt 0) { $held = @() }
       $out = @{ id = $id; resumed = $n }
     } else {
       $out = @{ id = $id; playing = @($sessions | Where-Object { "$($_.GetPlaybackInfo().PlaybackStatus)" -eq 'Playing' } | ForEach-Object { $_.SourceAppUserModelId }) }
@@ -53,6 +53,18 @@ function createMediaControl(workDir) {
   let proc = null;
   let seq = 0;
   const pending = new Map();   // id → resolve
+  const logPath = path.join(workDir, 'media-log.txt');
+  let heldCount = 0;           // how many players WE paused, so resume only runs after a real pause
+
+  // One line per command so a "it didn't pause" report can be traced. Never throws.
+  function log(cmd, msg) {
+    try {
+      const line = `${new Date().toISOString()} ${cmd} -> ${JSON.stringify(msg)}
+`;
+      if (fs.existsSync(logPath) && fs.statSync(logPath).size > 200 * 1024) fs.writeFileSync(logPath, '');
+      fs.appendFileSync(logPath, line);
+    } catch {}
+  }
 
   function ensure() {
     if (proc) return;
@@ -78,14 +90,32 @@ function createMediaControl(workDir) {
       try { ensure(); } catch { return resolve({ error: 'media helper unavailable' }); }
       const id = String(++seq);
       const timer = setTimeout(() => { pending.delete(id); resolve({ error: 'timeout' }); }, 4000);
-      pending.set(id, (msg) => { clearTimeout(timer); resolve(msg); });
+      pending.set(id, (msg) => { clearTimeout(timer); log(cmd, msg); resolve(msg); });
       proc.stdin.write(`${cmd} ${id}\n`);
     });
   }
 
+  async function pause() {
+    const r = await send('pause');
+    heldCount = r.paused || 0;
+    return r;
+  }
+
+  // Chrome can still report "Playing"/"Paused" a moment late, so one retry after a short wait
+  async function resume() {
+    if (!heldCount) return { resumed: 0, skipped: true };
+    let r = await send('resume');
+    if (!r.resumed) {
+      await new Promise((ok) => setTimeout(ok, 800));
+      r = await send('resume');
+    }
+    heldCount = 0;
+    return r;
+  }
+
   return {
-    pause:  () => send('pause'),    // → { paused: <how many>, apps: [...] }
-    resume: () => send('resume'),   // → { resumed: <how many> }
+    pause,                          // → { paused: <how many>, apps: [...] }
+    resume,                         // → { resumed: <how many> }
     status: () => send('status'),   // → { playing: [...] }
     warm:   () => { try { ensure(); } catch {} },
     stop:   () => { if (proc) proc.kill(); },
