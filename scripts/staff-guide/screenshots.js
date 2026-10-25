@@ -78,7 +78,7 @@ async function seed() {
   await api('POST', `/queue/departments/${ids.ACC.id}/call-next`, { staff_id: admin.user?.user_id || 1 }, t);
 
   await api('POST', '/announcements', { message_text: 'Please have your documents ready when your number is called.', message_text_ar: 'يرجى تجهيز المستندات عند النداء على رقمك.', speak_language: 'both', display_order: 1, is_active: true }, t);
-  await api('POST', '/announcements', { message_text: 'The school office closes at 2 PM on Thursdays.', message_text_ar: 'يغلق مكتب المدرسة الساعة ٢ ظهراً يوم الخميس.', speak_language: 'both', display_order: 2, is_active: true }, t);
+  await api('POST', '/announcements', { message_text: 'The school office closes at 2 PM on Thursdays.', message_text_ar: 'يغلق مكتب المدرسة الساعة ٢ ظهراً يوم الخميس.', speak_language: 'both', display_order: 2, is_active: true, repeat_count: 3, repeat_gap_minutes: 5 }, t);
 
   return {
     reception: await login('reception1'),
@@ -162,8 +162,8 @@ async function main() {
 
   await p.goto(BASE + '/announcements');
   await shot(p, 'announcements', { wait: 1500 });
-  await p.click('text=+ Add Announcement');
-  await shot(p, 'announcements-form', { wait: 500 });
+  await p.locator('button:has-text("Announce")').nth(1).click();
+  await shot(p, 'announcements-repeating', { wait: 1500 });
 
   await p.goto(BASE + '/reports');
   await p.click('button:has-text("Generate Report")');
