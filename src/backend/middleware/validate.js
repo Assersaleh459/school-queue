@@ -51,11 +51,15 @@ const rules = {
   createAnnouncement: [
     v(body('message_text').trim().notEmpty().withMessage('Message text is required')),
     v(body('speak_language').optional().isIn(VALID_LANG).withMessage('Invalid language')),
+    v(body('repeat_count').optional().isInt({ min: 1, max: 10 }).withMessage('Repeat must be 1–10 times')),
+    v(body('repeat_gap_minutes').optional().isInt({ min: 1, max: 60 }).withMessage('Gap must be 1–60 minutes')),
   ],
 
   updateAnnouncement: [
     v(body('message_text').trim().notEmpty().withMessage('Message text is required')),
     v(body('speak_language').optional().isIn(VALID_LANG).withMessage('Invalid language')),
+    v(body('repeat_count').optional().isInt({ min: 1, max: 10 }).withMessage('Repeat must be 1–10 times')),
+    v(body('repeat_gap_minutes').optional().isInt({ min: 1, max: 60 }).withMessage('Gap must be 1–60 minutes')),
   ],
 
   createTicket: [

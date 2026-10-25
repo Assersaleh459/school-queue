@@ -10,6 +10,7 @@ const { createEngine, validVoice, NUMBER_SLOTS, SHIPPED_VOICE, DEFAULT_ENGINE_DI
 const pack = require('../voice-engine/pack');
 const schoolSetup = require('../schoolSetup');
 const voiceLock = require('../voiceLock');
+const announceSeries = require('../announceSeries');
 const { wipeAll } = require('../wipe');
 const socketHandlers = require('../socket/handlers');
 const jwt = require('jsonwebtoken');
@@ -280,6 +281,7 @@ router.post('/wipe', [authMiddleware, requireRole('super_admin'), (req, res, nex
     return res.status(500).json({ error: `Fresh start failed: ${err.message}` });
   }
   invalidateSettings();
+  announceSeries.stop();
   res.json({ success: true });
   socketHandlers.forceLogoutAll();
   req.io.emit('settings_updated');
@@ -365,16 +367,40 @@ router.post('/import/:id', admin, (req, res) => {
 // ── Spoken announcements ─────────────────────────────────────────────────────
 
 // Plays an announcement on the display(s) now — recorded voice if available, else online voice.
+// "Repeat 3 times every 5 min" runs on the server (announceSeries), so every display hears every
+// repeat. Each repeat re-reads the row: an edit is used, a deleted row (or a count edited below
+// the repeats already done) stops the series.
 router.post('/announce/:id', canAnnounce, (req, res) => {
   const a = db.prepare('SELECT * FROM announcements WHERE announcement_id = ?').get(req.params.id);
   if (!a) return res.status(404).json({ error: 'Announcement not found' });
-  req.io.to('public_monitor').emit('announcement_spoken', {
-    text_en: a.message_text,
-    text_ar: a.message_text_ar || null,
-    speak_language: a.speak_language || 'en',
+  const count = Math.min(Math.max(parseInt(a.repeat_count) || 1, 1), 10);
+  const gap   = Math.min(Math.max(parseInt(a.repeat_gap_minutes) || 5, 1), 60);
+  const io = req.io;
+  announceSeries.start({
+    io, announcement_id: a.announcement_id, count, gapMs: gap * 60000,
+    speak: (n) => {
+      const row = db.prepare('SELECT * FROM announcements WHERE announcement_id = ?').get(a.announcement_id);
+      if (!row || (n > 1 && n > (parseInt(row.repeat_count) || 1))) return false;
+      io.to('public_monitor').emit('announcement_spoken', {
+        text_en: row.message_text,
+        text_ar: row.message_text_ar || null,
+        speak_language: row.speak_language || 'en',
+      });
+      return true;
+    },
   });
-  log(req.user?.user_id, 'ANNOUNCEMENT_SPOKEN', 'announcement', a.announcement_id, { message_text: a.message_text });
-  res.json({ success: true });
+  log(req.user?.user_id, 'ANNOUNCEMENT_SPOKEN', 'announcement', a.announcement_id, { message_text: a.message_text, repeat_count: count, repeat_gap_minutes: gap });
+  res.json({ success: true, repeat_count: count, repeat_gap_minutes: gap });
+});
+
+// The running series, for the badge on the Announcements screen: { announcement_id, done, total, next_at } or null
+router.get('/announce', canAnnounce, (req, res) => res.json(announceSeries.status()));
+
+// ⏹ Stop: ends the running series (a repeat already playing on the display finishes)
+router.delete('/announce', canAnnounce, (req, res) => {
+  const was = announceSeries.stop();
+  if (was) log(req.user?.user_id, 'ANNOUNCEMENT_STOPPED', 'announcement', was.announcement_id, { done: was.done, total: was.total });
+  res.json({ success: true, stopped: !!was });
 });
 
 module.exports = router;

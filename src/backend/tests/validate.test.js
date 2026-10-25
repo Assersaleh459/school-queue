@@ -58,3 +58,26 @@ describe('Validation rules — createTicket', () => {
     expect(res.status).toBe(200);
   });
 });
+
+describe('Validation rules — createAnnouncement (repeat boxes)', () => {
+  const app = makeApp(rules.createAnnouncement);
+  const send = (extra) => request(app).post('/test').send({ message_text: 'Hello', ...extra });
+
+  test('repeat must be 1–10 times', async () => {
+    expect((await send({ repeat_count: 0 })).status).toBe(422);
+    expect((await send({ repeat_count: 11 })).status).toBe(422);
+    expect((await send({ repeat_count: 'x' })).status).toBe(422);
+    expect((await send({ repeat_count: 3 })).status).toBe(200);
+    expect((await send({ repeat_count: '10' })).status).toBe(200);
+  });
+
+  test('gap must be 1–60 minutes', async () => {
+    expect((await send({ repeat_gap_minutes: 0 })).status).toBe(422);
+    expect((await send({ repeat_gap_minutes: 61 })).status).toBe(422);
+    expect((await send({ repeat_gap_minutes: 60 })).status).toBe(200);
+  });
+
+  test('both boxes are optional (old clients)', async () => {
+    expect((await send({})).status).toBe(200);
+  });
+});

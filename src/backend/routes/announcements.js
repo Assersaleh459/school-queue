@@ -29,20 +29,22 @@ router.get('/all', canManage, (req, res) => {
 });
 
 router.post('/', canEdit, rules.createAnnouncement, checkValidation, (req, res) => {
-  const { message_text, message_text_ar, speak_language, display_order, is_active } = req.body;
+  const { message_text, message_text_ar, speak_language, display_order, is_active, repeat_count, repeat_gap_minutes } = req.body;
   const result = db.prepare(
-    'INSERT INTO announcements (message_text, message_text_ar, speak_language, display_order, is_active) VALUES (?, ?, ?, ?, ?)'
-  ).run(message_text, message_text_ar || null, speak_language || 'en', display_order || 99, is_active ? 1 : 0);
+    'INSERT INTO announcements (message_text, message_text_ar, speak_language, display_order, is_active, repeat_count, repeat_gap_minutes) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  ).run(message_text, message_text_ar || null, speak_language || 'en', display_order || 99, is_active ? 1 : 0,
+    parseInt(repeat_count) || 1, parseInt(repeat_gap_minutes) || 5);
   req.io.emit('announcements_updated');   // displays refresh their ticker now
   log(req.user?.user_id, 'ANNOUNCEMENT_CREATED', 'announcement', result.lastInsertRowid, { message_text });
   res.json({ success: true, announcement_id: result.lastInsertRowid });
 });
 
 router.put('/:id', canEdit, rules.updateAnnouncement, checkValidation, (req, res) => {
-  const { message_text, message_text_ar, speak_language, display_order, is_active } = req.body;
+  const { message_text, message_text_ar, speak_language, display_order, is_active, repeat_count, repeat_gap_minutes } = req.body;
   db.prepare(
-    'UPDATE announcements SET message_text=?, message_text_ar=?, speak_language=?, display_order=?, is_active=? WHERE announcement_id=?'
-  ).run(message_text, message_text_ar || null, speak_language || 'en', display_order, is_active ? 1 : 0, req.params.id);
+    'UPDATE announcements SET message_text=?, message_text_ar=?, speak_language=?, display_order=?, is_active=?, repeat_count=?, repeat_gap_minutes=? WHERE announcement_id=?'
+  ).run(message_text, message_text_ar || null, speak_language || 'en', display_order, is_active ? 1 : 0,
+    parseInt(repeat_count) || 1, parseInt(repeat_gap_minutes) || 5, req.params.id);
   req.io.emit('announcements_updated');
   log(req.user?.user_id, 'ANNOUNCEMENT_UPDATED', 'announcement', parseInt(req.params.id), { message_text });
   res.json({ success: true });

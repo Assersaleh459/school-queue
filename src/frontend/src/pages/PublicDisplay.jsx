@@ -109,60 +109,83 @@ export default function PublicDisplay() {
   // All speak-relevant settings in a ref — avoids stale closures in socket handlers
   const s = useRef({ announceLang: 'en', audioEnabled: true, voiceMode: 'recorded', custom: {}, ...DEFAULT_TEMPLATES });
 
-  // One AbortController per speak() call; aborting it stops audio + cancels speech
-  const abortCtrl   = useRef(null);
-  const speakQueue  = useRef([]);
-  const mediaHeld       = useRef(false); // we paused (or checked) media for the current run of announcements
+  // One spoken line: ticket calls first (arrival order, never cut), then announcements. A call that
+  // arrives while an announcement is speaking cuts it; the announcement goes back to the front of
+  // the announcement part and replays from the start after the calls.
+  // Entry: { kind: 'call' | 'announcement', key, build, banner } — build() gives fresh items each
+  // time (a cut clip can't be replayed). Items: { audio } recorded clip | { text, lang } TTS | { pause }
+  const line    = useRef([]);     // waiting entries
+  const current = useRef(null);   // { entry, ctrl } speaking now
+  const bannerShown     = useRef(false);
+  const mediaHeld       = useRef(false); // we paused (or checked) media for the current run of speech
   const mediaWasPlaying = useRef(false); // something was actually playing → show the banner, resume after
 
-  // drainQueue processes the queue sequentially, respecting the abort signal.
-  // Items: { audio } recorded clip | { text, lang } TTS | { pause } gap between languages
-  const drainQueue = useCallback(async (signal) => {
-    while (speakQueue.current.length > 0 && !signal.aborted) {
-      const item = speakQueue.current.shift();
+  // Plays one entry's items in order, respecting the abort signal.
+  const playItems = useCallback(async (items, signal) => {
+    for (const item of items) {
+      if (signal.aborted) return;
       if (item.pause)      await sleep(item.pause, signal);
       else if (item.audio) await playClip(item.audio, signal);
       else                 await playTTS(item.text, item.lang, signal);
     }
   }, []);
 
-  // play() cancels any in-flight audio (ticket call or announcement), then plays the new items.
-  // In the SchoolQ desktop app it also pauses media that is actually playing (and only that),
-  // and shows a banner over it; both are undone when the last announcement finishes.
-  const play = useCallback((items, banner) => {
-    abortCtrl.current?.abort();
-    window.speechSynthesis?.cancel();
+  // Where the announcement part of the line starts = where the next call goes (after the last call)
+  const announcementStart = () => {
+    const i = line.current.findIndex(e => e.kind === 'announcement');
+    return i < 0 ? line.current.length : i;
+  };
 
-    const ctrl = new AbortController();
-    abortCtrl.current = ctrl;
-    speakQueue.current = items;
-
-    const run = async () => {
-      const desktop = window.electronAPI;
-      // Pause once per run of announcements; a call that interrupts another keeps the hold.
+  // Speaks the line until it is empty. In the SchoolQ desktop app it pauses media that is actually
+  // playing (once per run, and only that) and shows a banner for the entry speaking; both are
+  // undone when the line empties.
+  const runLine = useCallback(async () => {
+    if (current.current) return;
+    const desktop = window.electronAPI;
+    while (line.current.length) {
+      const entry = line.current.shift();
+      const ctrl = new AbortController();
+      current.current = { entry, ctrl };
       if (!mediaHeld.current && s.current.mediaPause && desktop?.mediaPause) {
         mediaHeld.current = true;
         const r = await desktop.mediaPause().catch(() => null);
         mediaWasPlaying.current = (r?.paused || 0) > 0;
       }
       const mode = s.current.callBanner;
-      const showBanner = banner && desktop?.showBanner && (mode === 'always' || (mode !== 'never' && mediaWasPlaying.current));
-      if (showBanner) desktop.showBanner(banner);
-
-      await drainQueue(ctrl.signal);
-
-      // Only when the announcement finishes naturally — an interrupting call takes over
-      if (!ctrl.signal.aborted) {
-        if (showBanner) desktop.hideBanner?.();
-        if (mediaHeld.current) {
-          mediaHeld.current = false;
-          mediaWasPlaying.current = false;
-          await desktop?.mediaResume?.().catch(() => {});
-        }
+      if (entry.banner && desktop?.showBanner && (mode === 'always' || (mode !== 'never' && mediaWasPlaying.current))) {
+        desktop.showBanner(entry.banner);
+        bannerShown.current = true;
       }
-    };
-    run();
-  }, [drainQueue]);
+      await playItems(entry.build(), ctrl.signal);
+      current.current = null;
+      // Cut by a call → replays after the calls now waiting
+      if (ctrl.signal.aborted && entry.kind === 'announcement') line.current.splice(announcementStart(), 0, entry);
+    }
+    if (bannerShown.current) { bannerShown.current = false; desktop?.hideBanner?.(); }
+    if (mediaHeld.current) {
+      mediaHeld.current = false;
+      mediaWasPlaying.current = false;
+      await desktop?.mediaResume?.().catch(() => {});
+    }
+  }, [playItems]);
+
+  const enqueue = useCallback((entry) => {
+    const now = current.current?.entry;
+    if (entry.kind === 'call') {
+      const i = line.current.findIndex(e => e.kind === 'call' && e.key === entry.key);
+      if (i >= 0) line.current[i] = entry;                       // a recall of a ticket still waiting
+      else line.current.splice(announcementStart(), 0, entry);   // after the last call
+      if (now?.kind === 'announcement') {                        // calls win: cut it, it replays after
+        current.current.ctrl.abort();
+        window.speechSynthesis?.cancel();
+      }
+    } else {
+      const same = e => e.kind === 'announcement' && e.key === entry.key;
+      if (line.current.some(same) || (now && same(now))) return; // a repeat that caught up: once is enough
+      line.current.push(entry);
+    }
+    runLine();
+  }, [runLine]);
 
   // Ticket call / recall
   const speak = useCallback((ticketNumber, deptName, deptNameAr, recalled, roomNumber) => {
@@ -170,40 +193,49 @@ export default function PublicDisplay() {
 
     const num   = parseInt(ticketNumber.split('-').pop()) || 0;
     const langs = s.current.announceLang === 'both' ? ['en', 'ar'] : [s.current.announceLang];
-    const items = [];
 
-    for (const lang of langs) {
-      const tmpl = recalled
-        ? (lang === 'ar' ? s.current.recallAr : s.current.recallEn)
-        : (lang === 'ar' ? s.current.callAr   : s.current.callEn);
-      // Natural pause between language blocks when using "both"
-      if (items.length) items.push({ pause: 700 });
+    const build = () => {
+      const items = [];
+      for (const lang of langs) {
+        const tmpl = recalled
+          ? (lang === 'ar' ? s.current.recallAr : s.current.recallEn)
+          : (lang === 'ar' ? s.current.callAr   : s.current.callEn);
+        // Natural pause between language blocks when using "both"
+        if (items.length) items.push({ pause: 700 });
 
-      if (s.current.voiceMode === 'online') {
-        items.push({ text: applyVars(tmpl, num, deptName, lang, deptNameAr, roomNumber), lang });
-        continue;
+        if (s.current.voiceMode === 'online') {
+          items.push({ text: applyVars(tmpl, num, deptName, lang, deptNameAr, roomNumber), lang });
+          continue;
+        }
+        // Recorded voice: numbers + this school's clips; pieces without a recording use TTS
+        const department = lang === 'ar' && deptNameAr ? deptNameAr : deptName;
+        for (const item of buildPlan(tmpl, { number: num, department, room: roomNumber }, lang, s.current.custom)) {
+          items.push(item.src ? { audio: loadClip(item.src) } : { text: item.tts, lang });
+        }
       }
-      // Recorded voice: numbers + this school's clips; pieces without a recording use TTS
-      const department = lang === 'ar' && deptNameAr ? deptNameAr : deptName;
-      for (const item of buildPlan(tmpl, { number: num, department, room: roomNumber }, lang, s.current.custom)) {
-        items.push(item.src ? { audio: loadClip(item.src) } : { text: item.tts, lang });
-      }
-    }
-    play(items, { kind: 'call', ticket: ticketNumber, department: deptName, departmentAr: deptNameAr, room: roomNumber, final: !!recalled });
-  }, [play]);
+      return items;
+    };
+    enqueue({
+      kind: 'call', key: ticketNumber, build,
+      banner: { kind: 'call', ticket: ticketNumber, department: deptName, departmentAr: deptNameAr, room: roomNumber, final: !!recalled },
+    });
+  }, [enqueue]);
 
   // Admin pressed "Announce on display": the announcement voice's recording if there is one
   const speakAnnouncement = useCallback((data) => {
     if (!s.current.audioEnabled) return;
-    const voice = s.current.custom.announce || s.current.custom;
-    const items = [];
-    for (const t of announcementTexts({ message_text: data.text_en, message_text_ar: data.text_ar, speak_language: data.speak_language })) {
-      if (items.length) items.push({ pause: 700 });
-      const file = s.current.voiceMode !== 'online' && voice[t.lang]?.[clipKey(t.text)];
-      items.push(file ? { audio: loadClip(phraseUrl(voice, file)) } : { text: t.text, lang: t.lang });
-    }
-    play(items, { kind: 'announcement', text: data.text_en, textAr: data.text_ar });
-  }, [play]);
+    const build = () => {
+      const voice = s.current.custom.announce || s.current.custom;
+      const items = [];
+      for (const t of announcementTexts({ message_text: data.text_en, message_text_ar: data.text_ar, speak_language: data.speak_language })) {
+        if (items.length) items.push({ pause: 700 });
+        const file = s.current.voiceMode !== 'online' && voice[t.lang]?.[clipKey(t.text)];
+        items.push(file ? { audio: loadClip(phraseUrl(voice, file)) } : { text: t.text, lang: t.lang });
+      }
+      return items;
+    };
+    enqueue({ kind: 'announcement', key: data.text_en, build, banner: { kind: 'announcement', text: data.text_en, textAr: data.text_ar } });
+  }, [enqueue]);
 
   const loadVoice = useCallback(async () => {
     try { const r = await axios.get('/api/voice/manifest'); s.current.custom = r.data || {}; } catch {}

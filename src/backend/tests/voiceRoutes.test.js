@@ -6,16 +6,18 @@ const os = require('os');
 const path = require('path');
 const mockDir = fs.mkdtempSync(path.join(os.tmpdir(), 'voice-routes-'));
 
+let mockAnnouncement = null;   // the row 'SELECT * FROM announcements …' returns
 jest.mock('../database/db', () => ({
   name: require('path').join(mockDir, 'queue.db'),
   prepare: (sql) => ({
-    get: () => (sql.includes('is_active') ? { is_active: 1 } : null),
+    get: () => (sql.includes('FROM announcements') ? mockAnnouncement : sql.includes('is_active') ? { is_active: 1 } : null),
     run: () => ({ changes: 1 }),
     all: () => [],
   }),
   transaction: (fn) => (...args) => fn(...args),
 }));
 jest.mock('../audit', () => ({ log: jest.fn() }));
+jest.mock('../announceSeries', () => ({ start: jest.fn(), stop: jest.fn(() => null), status: jest.fn(() => null) }));
 let mockPayload = null;
 jest.mock('../license', () => ({ current: () => (mockPayload ? { payload: mockPayload } : null) }));
 jest.mock('../wipe', () => ({ wipeAll: jest.fn(async () => ({ adminId: 2 })) }));
@@ -26,12 +28,14 @@ const express = require('express');
 const { hashVoicePass } = require('../../../electron/license');
 const { clipFile } = require('../voice-engine/engine');
 const voiceLock = require('../voiceLock');
+const announceSeries = require('../announceSeries');
 const { wipeAll } = require('../wipe');
 const { log } = require('../audit');
 
+const io = { emit: jest.fn(), to: jest.fn(() => io) };   // io.to('public_monitor').emit(...) lands in io.emit too
 const app = express();
 app.use(express.json());
-app.use((req, res, next) => { req.io = { emit: jest.fn(), to: () => ({ emit: jest.fn() }) }; next(); });
+app.use((req, res, next) => { req.io = io; next(); });
 app.use('/api/voice', require('../routes/voice'));
 
 const tokenFor = (role, user_id = 1) => `Bearer ${jwt.sign({ user_id, username: 'u', role }, process.env.JWT_SECRET)}`;
@@ -118,6 +122,69 @@ describe('POST /api/voice/wipe', () => {
     const res = await wipe({ password: WIPE, confirm: 'WIPE' });
     expect(res.status).toBe(200);
     expect(wipeAll).toHaveBeenCalledWith(expect.objectContaining({ voiceDir: path.join(mockDir, 'voice'), by: 'u' }));
+  });
+});
+
+describe('📢 /api/voice/announce — repeat series (the loop itself is tested in announceSeries.test.js)', () => {
+  const row = { announcement_id: 5, message_text: 'Doors close at 2 PM', message_text_ar: 'الأبواب تغلق', speak_language: 'both', repeat_count: 3, repeat_gap_minutes: 5 };
+  const announce = () => request(app).post('/api/voice/announce/5').set('Authorization', SUPER);
+  beforeEach(() => { mockAnnouncement = { ...row }; jest.clearAllMocks(); });
+
+  test('starts a server-side series from the saved boxes; speaking goes to the displays', async () => {
+    const res = await announce();
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true, repeat_count: 3, repeat_gap_minutes: 5 });
+    expect(announceSeries.start).toHaveBeenCalledWith(expect.objectContaining({ announcement_id: 5, count: 3, gapMs: 5 * 60000 }));
+    const { speak } = announceSeries.start.mock.calls[0][0];
+    expect(speak(1)).toBe(true);
+    expect(io.to).toHaveBeenCalledWith('public_monitor');
+    expect(io.emit).toHaveBeenCalledWith('announcement_spoken', { text_en: 'Doors close at 2 PM', text_ar: 'الأبواب تغلق', speak_language: 'both' });
+    expect(log).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledWith(1, 'ANNOUNCEMENT_SPOKEN', 'announcement', 5, expect.objectContaining({ repeat_count: 3, repeat_gap_minutes: 5 }));
+  });
+
+  test('each repeat re-reads the row: edited text is used; deleted, or count lowered below the repeats done → stops', async () => {
+    await announce();
+    const { speak } = announceSeries.start.mock.calls[0][0];
+    mockAnnouncement = { ...row, message_text: 'Doors close at 3 PM' };
+    expect(speak(2)).toBe(true);
+    expect(io.emit).toHaveBeenLastCalledWith('announcement_spoken', expect.objectContaining({ text_en: 'Doors close at 3 PM' }));
+    mockAnnouncement = { ...row, repeat_count: 1 };
+    expect(speak(2)).toBe(false);
+    mockAnnouncement = null;
+    expect(speak(1)).toBe(false);
+  });
+
+  test('rows from before the boxes speak once; out-of-range values are clamped', async () => {
+    mockAnnouncement = { announcement_id: 5, message_text: 'Hi', repeat_count: null, repeat_gap_minutes: null };
+    expect((await announce()).body).toMatchObject({ repeat_count: 1, repeat_gap_minutes: 5 });
+    mockAnnouncement = { announcement_id: 5, message_text: 'Hi', repeat_count: 99, repeat_gap_minutes: 400 };
+    expect((await announce()).body).toMatchObject({ repeat_count: 10, repeat_gap_minutes: 60 });
+  });
+
+  test('404 for an unknown announcement', async () => {
+    mockAnnouncement = null;
+    expect((await announce()).status).toBe(404);
+    expect(announceSeries.start).not.toHaveBeenCalled();
+  });
+
+  test('GET shows the running series; DELETE (⏹ Stop) ends it and audits', async () => {
+    const running = { announcement_id: 5, done: 1, total: 3, next_at: '2026-10-25T12:00:00.000Z' };
+    announceSeries.status.mockReturnValueOnce(running);
+    expect((await request(app).get('/api/voice/announce').set('Authorization', SUPER)).body).toEqual(running);
+    expect((await request(app).get('/api/voice/announce').set('Authorization', SUPER)).body).toBeNull();
+
+    announceSeries.stop.mockReturnValueOnce(running);
+    const res = await request(app).delete('/api/voice/announce').set('Authorization', SUPER);
+    expect(res.body).toEqual({ success: true, stopped: true });
+    expect(log).toHaveBeenCalledWith(1, 'ANNOUNCEMENT_STOPPED', 'announcement', 5, { done: 1, total: 3 });
+    expect((await request(app).delete('/api/voice/announce').set('Authorization', SUPER)).body).toEqual({ success: true, stopped: false });
+  });
+
+  test('Fresh Start stops a running series', async () => {
+    const res = await request(app).post('/api/voice/wipe').set('Authorization', SUPER).set('X-Wipe-Unlock', wipeUnlocked()).send({ password: WIPE, confirm: 'WIPE' });
+    expect(res.status).toBe(200);
+    expect(announceSeries.stop).toHaveBeenCalled();
   });
 });
 

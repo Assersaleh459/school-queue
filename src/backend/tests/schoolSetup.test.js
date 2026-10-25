@@ -27,7 +27,7 @@ function sourceSchool() {
   db.prepare("INSERT INTO departments (name, name_ar, code, color_code, display_order, is_active, room_number) VALUES ('Accounting', 'الحسابات', 'ACC', '#5FAEB6', 1, 1, '12')").run();
   db.prepare("INSERT INTO departments (name, name_ar, code, color_code, display_order, is_active, room_number) VALUES ('Student Affairs', 'شؤون الطلبة', 'STA', '#223B73', 2, 1, NULL)").run();
   db.prepare("INSERT INTO service_categories (department_id, name, estimated_time_minutes, is_active) VALUES (1, 'Tuition Payment', 5, 1), (1, 'Refund', 10, 0), (2, 'Enrollment', 20, 1)").run();
-  db.prepare("INSERT INTO announcements (message_text, message_text_ar, speak_language, display_order, is_active) VALUES ('School hours: 8 AM - 3 PM', 'الدوام من 8 إلى 3', 'both', 1, 1)").run();
+  db.prepare("INSERT INTO announcements (message_text, message_text_ar, speak_language, display_order, is_active, repeat_count, repeat_gap_minutes) VALUES ('School hours: 8 AM - 3 PM', 'الدوام من 8 إلى 3', 'both', 1, 1, 3, 10)").run();
   return db;
 }
 
@@ -41,7 +41,7 @@ test('collects only the chosen parts, without ids or other settings', () => {
   expect(setup.departments).toHaveLength(2);
   expect(setup.departments[0]).toMatchObject({ name: 'Accounting', name_ar: 'الحسابات', code: 'ACC', room_number: '12', services: [{ name: 'Tuition Payment' }, { name: 'Refund', is_active: 0 }] });
   expect(setup.departments[0]).not.toHaveProperty('department_id');
-  expect(setup.announcements).toEqual([expect.objectContaining({ message_text: 'School hours: 8 AM - 3 PM', speak_language: 'both' })]);
+  expect(setup.announcements).toEqual([expect.objectContaining({ message_text: 'School hours: 8 AM - 3 PM', speak_language: 'both', repeat_count: 3, repeat_gap_minutes: 10 })]);
   expect(collect(sourceSchool(), { departments: true })).toEqual({ departments: expect.any(Array) });
   expect(summarize(setup)).toEqual({ callWording: 2, voices: { voice_speaker: 'Esraa', voice_announce: 'Esraa' }, departments: 2, services: 3, announcements: 1 });
   expect(summarize({})).toBeNull();
@@ -59,9 +59,20 @@ test('a clean new school gets everything; importing again adds nothing', () => {
   expect(db.prepare("SELECT setting_value FROM settings WHERE setting_key = 'call_template_ar'").get().setting_value).toContain('تنبيه');
   expect(db.prepare("SELECT setting_value FROM settings WHERE setting_key = 'school_name'").get()).toBeUndefined();
 
+  expect(db.prepare('SELECT repeat_count, repeat_gap_minutes FROM announcements').get()).toEqual({ repeat_count: 3, repeat_gap_minutes: 10 });
+
   const again = apply(db, setup, ALL);
   expect(again).toMatchObject({ departments: 0, departmentsSkipped: 2, services: 0, announcements: 0, announcementsSkipped: 1 });
   expect(db.prepare('SELECT COUNT(*) AS n FROM service_categories').get().n).toBe(3);
+});
+
+test('a pack from before 1.18.0 (no repeat boxes), or with bad values, imports as once / 5 min', () => {
+  const db = freshDb();
+  apply(db, { announcements: [{ message_text: 'Old' }, { message_text: 'Bad', repeat_count: 99, repeat_gap_minutes: 'x' }] }, { announcements: true });
+  expect(db.prepare('SELECT message_text, repeat_count, repeat_gap_minutes FROM announcements ORDER BY announcement_id').all()).toEqual([
+    { message_text: 'Old', repeat_count: 1, repeat_gap_minutes: 5 },
+    { message_text: 'Bad', repeat_count: 1, repeat_gap_minutes: 5 },
+  ]);
 });
 
 test('keeps what the other school has: matches by name, adds missing services, frees a taken code', () => {

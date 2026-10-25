@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { adminAPI, voiceAPI, settingsAPI } from '../../lib/api';
 import { toast } from '../../store/useToastStore';
 import { useLiveRefresh } from '../../lib/useLiveRefresh';
+import { onServerEvent } from '../../lib/serverLink';
 import { announcementTexts, clipKey, phraseUrl, unrecordedTexts } from '../../lib/voiceClips';
 
-const EMPTY = { message_text: '', message_text_ar: '', speak_language: 'en', display_order: '', is_active: true };
+const EMPTY = { message_text: '', message_text_ar: '', speak_language: 'en', display_order: '', is_active: true, repeat_count: 1, repeat_gap_minutes: 5 };
 
 const LANG_LABELS = { en: 'EN', ar: 'AR', both: 'EN+AR' };
 const LANG_COLORS = { en: 'bg-blue-100 text-blue-700', ar: 'bg-green-100 text-green-800', both: 'bg-purple-100 text-purple-700' };
@@ -70,14 +71,25 @@ export default function Announcements({ announceOnly = false }) {
   const [saving, setSaving]               = useState(false);
   const [testing, setTesting]             = useState(false);
   const [recorded, setRecorded]           = useState(null);   // see loadRecordedVoice
+  const [series, setSeries]               = useState(null);   // the 📢 series repeating now: { announcement_id, done, total, next_at } or null
 
   const loadVoice = () => loadRecordedVoice().then(v => { setRecorded(v); return v; }).catch(() => null);
-  useEffect(() => { load(); loadVoice(); }, []);
+  const loadSeries = () => voiceAPI.announceStatus().then(r => setSeries(r.data || null)).catch(() => {});
+  useEffect(() => { load(); loadVoice(); loadSeries(); }, []);
 
   // Recordings finish in the background and the list can change on another screen: reload when
   // the server says so (one reload per burst of finished clips) and when it comes back
-  useLiveRefresh(['voice_updated', 'announcements_updated', 'settings_updated'], () => { load(); loadVoice(); });
+  useLiveRefresh(['voice_updated', 'announcements_updated', 'settings_updated'], () => { load(); loadVoice(); loadSeries(); });
   const notRecorded = (a, v = recorded) => !!v && unrecordedTexts(a, v.manifest).length > 0;
+
+  // 🔁 badge: the server broadcasts every change of the running series; a 30 s tick keeps "next in N min" right
+  useEffect(() => {
+    const off = onServerEvent('announcement_series', (sr) => setSeries(sr || null));
+    const t = setInterval(() => setSeries(sr => (sr ? { ...sr } : sr)), 30000);
+    return () => { off(); clearInterval(t); };
+  }, []);
+  const nextIn = (sr) => Math.max(1, Math.round((new Date(sr.next_at) - Date.now()) / 60000));
+  const repeating = (a) => series?.announcement_id === a.announcement_id;
 
   const load = () => adminAPI.getAnnouncements().then(r => setAnnouncements(r.data)).catch(() => {});
 
@@ -97,7 +109,9 @@ export default function Announcements({ announceOnly = false }) {
       message_text_ar: a.message_text_ar || '',
       speak_language:  a.speak_language || 'en',
       display_order:   a.display_order,
-      is_active:       !!a.is_active
+      is_active:       !!a.is_active,
+      repeat_count:    a.repeat_count || 1,
+      repeat_gap_minutes: a.repeat_gap_minutes || 5,
     });
     setError('');
     setShowForm(true);
@@ -111,7 +125,9 @@ export default function Announcements({ announceOnly = false }) {
       const payload = {
         ...form,
         message_text_ar: form.message_text_ar || null,
-        display_order:   parseInt(form.display_order) || 99
+        display_order:   parseInt(form.display_order) || 99,
+        repeat_count:    parseInt(form.repeat_count) || 1,
+        repeat_gap_minutes: parseInt(form.repeat_gap_minutes) || 5,
       };
       if (editing) {
         await adminAPI.updateAnnouncement(editing.announcement_id, payload);
@@ -141,6 +157,19 @@ export default function Announcements({ announceOnly = false }) {
     await preview(form);
     setTesting(false);
   };
+
+  // ⏹ Stop repeating (a repeat already playing on the display finishes)
+  const handleStop = async () => {
+    try {
+      await voiceAPI.announceStop();
+      setSeries(null);
+      toast.info('Stopped repeating');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not stop');
+    }
+  };
+
+  const repeats = parseInt(form.repeat_count) > 1;
 
   return (
     <div>
@@ -178,18 +207,35 @@ export default function Announcements({ announceOnly = false }) {
                     🎙 Not recorded
                   </span>
                 )}
+                {repeating(a) && (
+                  <span className="shrink-0 text-xs font-semibold px-2 py-0.5 rounded bg-teal bg-opacity-10 text-navy" title="This announcement is repeating on the display">
+                    🔁 Repeating · {series.done} of {series.total} · next in {nextIn(series)} min
+                  </span>
+                )}
               </div>
               {a.message_text_ar && (
                 <p className="text-sm text-gray-500 mt-0.5 text-right font-arabic" dir="rtl">{a.message_text_ar}</p>
               )}
-              <p className="text-xs text-gray-400 mt-1">Order: {a.display_order} · {a.is_active ? 'Showing on display' : 'Hidden'}</p>
+              <p className="text-xs text-gray-400 mt-1">
+                Order: {a.display_order} · {a.repeat_count > 1 ? `Repeats ${a.repeat_count}× every ${a.repeat_gap_minutes} min · ` : ''}{a.is_active ? 'Showing on display' : 'Hidden'}
+              </p>
             </div>
             <div className="flex gap-2 shrink-0">
+              {repeating(a) && (
+                <button
+                  onClick={handleStop}
+                  className="px-3 py-1 bg-amber-500 text-white rounded text-sm hover:bg-amber-600"
+                  title="Stop repeating this announcement"
+                >
+                  ⏹ Stop
+                </button>
+              )}
               <button
                 onClick={async () => {
                   try {
-                    await voiceAPI.announce(a.announcement_id);
-                    toast.success('Announced on the display');
+                    const r = await voiceAPI.announce(a.announcement_id);
+                    const n = r.data?.repeat_count || 1;
+                    toast.success(n > 1 ? `Announcing ${n} times, every ${r.data.repeat_gap_minutes} min` : 'Announced on the display');
                   } catch (err) {
                     toast.error(err.response?.data?.error || 'Could not announce');
                   }
@@ -307,6 +353,37 @@ export default function Announcements({ announceOnly = false }) {
                   </label>
                 </div>
               </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Repeat (times)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    value={form.repeat_count}
+                    onChange={e => set('repeat_count', e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal"
+                  />
+                </div>
+                <div>
+                  <label className={`block text-sm font-semibold mb-1 ${repeats ? 'text-gray-700' : 'text-gray-400'}`}>Gap between repeats (minutes)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="60"
+                    value={form.repeat_gap_minutes}
+                    disabled={!repeats}
+                    onChange={e => set('repeat_gap_minutes', e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal disabled:bg-gray-100 disabled:text-gray-400"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 -mt-2">
+                {repeats
+                  ? `📢 says it ${form.repeat_count} times, ${form.repeat_gap_minutes} min apart. A ticket call is never cut: the announcement waits for it, or plays again after it.`
+                  : '📢 says it once. Set Repeat to 2 or more to say it again after a gap.'}
+              </p>
 
               {error && <p className="text-red-500 text-sm">{error}</p>}
 

@@ -117,6 +117,8 @@ export const voiceAPI = {
   remove:     (lang, text, voice, everywhere = false) => api.post('/voice/remove', { lang, text, voice, everywhere }),
   install:    ()                    => api.post('/voice/engine/install'),
   announce:   (id)                  => api.post(`/voice/announce/${id}`),
+  announceStatus: ()                => api.get('/voice/announce'),      // the running repeat series, or null
+  announceStop:   ()                => api.delete('/voice/announce'),   // ⏹ Stop repeating
   voices:     ()                    => api.get('/voice/voices'),
   prepare:    (name, items)         => api.post(`/voice/voices/${name}/prepare`, { items }),
   use:        (name, forWhat = 'calls') => api.post(`/voice/voices/${name}/use`, { for: forWhat }),

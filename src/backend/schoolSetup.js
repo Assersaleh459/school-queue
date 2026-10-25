@@ -29,7 +29,7 @@ function collect(db, parts = {}) {
       }));
   }
   if (parts.announcements) {
-    setup.announcements = db.prepare('SELECT message_text, message_text_ar, speak_language, display_order, is_active FROM announcements ORDER BY display_order, announcement_id').all();
+    setup.announcements = db.prepare('SELECT message_text, message_text_ar, speak_language, display_order, is_active, repeat_count, repeat_gap_minutes FROM announcements ORDER BY display_order, announcement_id').all();
   }
   return setup;
 }
@@ -117,9 +117,12 @@ function apply(db, setup, parts = {}, { canUseVoice = () => true } = {}) {
         const text = str(a?.message_text, 1000);
         if (!text) continue;
         if (have.some(h => same(h.message_text, text))) { done.announcementsSkipped++; continue; }
-        db.prepare('INSERT INTO announcements (message_text, message_text_ar, speak_language, display_order, is_active) VALUES (?, ?, ?, ?, ?)')
+        // Packs from before 1.18.0 have no repeat fields → once, 5 min
+        const int = (v, min, max, dflt) => (Number.isInteger(v) && v >= min && v <= max ? v : dflt);
+        db.prepare('INSERT INTO announcements (message_text, message_text_ar, speak_language, display_order, is_active, repeat_count, repeat_gap_minutes) VALUES (?, ?, ?, ?, ?, ?, ?)')
           .run(text, str(a.message_text_ar, 1000), ['en', 'ar', 'both'].includes(a.speak_language) ? a.speak_language : 'en',
-            Number.isInteger(a.display_order) ? a.display_order : null, a.is_active === 0 ? 0 : 1);
+            Number.isInteger(a.display_order) ? a.display_order : null, a.is_active === 0 ? 0 : 1,
+            int(a.repeat_count, 1, 10, 1), int(a.repeat_gap_minutes, 1, 60, 5));
         have.push({ message_text: text });
         done.announcements++;
       }

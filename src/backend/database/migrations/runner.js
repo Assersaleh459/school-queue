@@ -51,6 +51,16 @@ const MIGRATIONS = [
             value TEXT NOT NULL
           )`,
   },
+  {
+    // An announcement can be spoken several times (📢): how many, and the gap between repeats.
+    // One statement per entry: the "duplicate column" catch below covers a whole exec.
+    id: '009_add_announcement_repeat_count',
+    sql: 'ALTER TABLE announcements ADD COLUMN repeat_count INTEGER DEFAULT 1',
+  },
+  {
+    id: '010_add_announcement_repeat_gap',
+    sql: 'ALTER TABLE announcements ADD COLUMN repeat_gap_minutes INTEGER DEFAULT 5',
+  },
 ];
 
 function runMigrations(db) {

@@ -230,8 +230,10 @@ module.exports = {
           ['Write the **English Text**. The Arabic text is optional.'],
           ['Under **Voice Language**, choose **English**, **Arabic** or **Both**. Set the **Display Order** number.'],
           ['Tick **Show on display** if the message must scroll on the TV.'],
+          ['To say the message more than once, set **Repeat (times)** and **Gap between repeats (minutes)**. A ticket call is never cut: the announcement waits for the call, or plays again after it.'],
           ['Click **Test Voice** to hear it. Then click **Save**.'],
           ['In the list, the megaphone button announces the message now and the play button gives a preview. Use **Edit** or **Delete** to change or remove a message.'],
+          ['While a message repeats, its row shows **Repeating** with the count. Click **Stop** to end the repeats.'],
         ],
         tips: [
           'Keep each message short.',
@@ -247,8 +249,10 @@ module.exports = {
           ['اكتب **English Text**. النص العربي اختياري.'],
           ['من **Voice Language** اختر **English** أو **Arabic** أو **Both**. وحدد رقم **Display Order**.'],
           ['فعّل **Show on display** إذا أردت ظهور الرسالة على التلفاز.'],
+          ['لتكرار الرسالة أكثر من مرة، حدد **Repeat (times)** و**Gap between repeats (minutes)**. نداء التذاكر لا يُقطع أبداً: الإعلان ينتظر النداء، أو يُعاد بعده.'],
           ['اضغط **Test Voice** للاستماع. ثم اضغط **Save**.'],
           ['في القائمة: زر مكبّر الصوت يذيع الرسالة الآن، وزر التشغيل يعرض معاينة. استخدم **Edit** أو **Delete** للتعديل أو الحذف.'],
+          ['أثناء التكرار يظهر في صف الرسالة **Repeating** مع العدد. اضغط **Stop** لإيقاف التكرار.'],
         ],
         tips: [
           'اجعل كل رسالة قصيرة.',
