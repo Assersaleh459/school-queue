@@ -356,45 +356,57 @@ export default function PublicDisplay() {
             <div
               key={dept.department_id}
               className="bg-white rounded-2xl shadow-lg flex flex-col overflow-hidden min-h-0"
-              style={{ borderTop: `6px solid ${color}` }}
+              style={{ borderTop: `6px solid ${color}`, containerType: 'size' }}
             >
-              <div className="px-6 py-3 text-center shrink-0" style={{ backgroundColor: color + '1A' }}>
-                <h2 className="text-2xl font-black tracking-wide leading-tight" style={{ color }}>
-                  {dept.name.toUpperCase()}
-                </h2>
-                <p className="text-gray-400 text-sm font-semibold">{dept.code}</p>
+              {/* Sizes below are min(normal size, share of the card height), so on a small screen every part
+                  shrinks and a two-line name can't push "Now serving" out of the card. Big screens look as before. */}
+              <div className="px-6 text-center shrink-0" style={{ backgroundColor: color + '1A', paddingBlock: 'min(0.75rem, 2.5cqh)' }}>
+                {/* A long single word (ADMINISTRATION) can't wrap, so size the name to the card, never above 1.5rem.
+                    shortcut: 0.95em per capital letter incl. spacing (wide fonts on some PCs); widen it if the font changes. */}
+                <div style={{ containerType: 'inline-size' }}>
+                  <h2
+                    className="font-black tracking-wide leading-tight"
+                    style={{
+                      color,
+                      fontSize: `min(1.5rem, 9cqh, calc(100cqw / ${Math.max(...dept.name.split(/\s+/).map(w => w.length), 1) * 0.95}))`,
+                    }}
+                  >
+                    {dept.name.toUpperCase()}
+                  </h2>
+                </div>
+                <p className="text-gray-400 font-semibold" style={{ fontSize: 'min(0.875rem, 5cqh)' }}>{dept.code}</p>
               </div>
 
-              <div className="flex-1 flex flex-col items-center justify-center px-4 py-4 gap-3 min-h-0 overflow-hidden">
-                <p className="text-base text-gray-400 uppercase tracking-widest font-semibold">Now Serving</p>
+              <div className="flex-1 flex flex-col items-center justify-center px-4 min-h-0 overflow-hidden" style={{ paddingBlock: 'min(1rem, 2cqh)', gap: 'min(0.75rem, 2cqh)' }}>
+                <p className="text-gray-400 uppercase tracking-widest font-semibold" style={{ fontSize: 'min(1rem, 6cqh)' }}>Now Serving</p>
                 {data.current ? (
                   <>
                     <div className="w-full" style={{ color }}>
                       <TicketNumber
                         value={data.current.ticket_number}
-                        maxSize={cols <= 2 ? '3.5rem' : '2.5rem'}
+                        maxSize={`min(${cols <= 2 ? '3.5rem' : '2.5rem'}, 14cqh)`}
                         spacing={0.05}
                         className="font-black text-center"
                       />
                     </div>
-                    <p className="text-xl text-gray-500 font-semibold">{data.counter}</p>
+                    <p className="text-gray-500 font-semibold" style={{ fontSize: 'min(1.25rem, 7cqh)' }}>{data.counter}</p>
                   </>
                 ) : (
-                  <p className="text-4xl text-gray-300 font-black">— — —</p>
+                  <p className="text-gray-300 font-black" style={{ fontSize: 'min(2.25rem, 12cqh)' }}>— — —</p>
                 )}
               </div>
 
               <div
-                className="shrink-0 border-t border-gray-100 px-5 py-3 flex justify-between items-center"
-                style={{ backgroundColor: color + '08' }}
+                className="shrink-0 border-t border-gray-100 px-5 flex justify-between items-center"
+                style={{ backgroundColor: color + '08', paddingBlock: 'min(0.75rem, 2.5cqh)' }}
               >
                 <div className="text-center">
-                  <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-0.5">Next</p>
-                  <p className="text-lg font-bold text-gray-700 whitespace-nowrap">{data.next?.ticket_number || '—'}</p>
+                  <p className="text-gray-400 uppercase tracking-wide font-semibold mb-0.5" style={{ fontSize: 'min(0.75rem, 4cqh)' }}>Next</p>
+                  <p className="font-bold text-gray-700 whitespace-nowrap" style={{ fontSize: 'min(1.125rem, 7cqh)' }}>{data.next?.ticket_number || '—'}</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-0.5">Waiting</p>
-                  <p className="text-2xl font-black" style={{ color }}>{data.waiting_count ?? 0}</p>
+                  <p className="text-gray-400 uppercase tracking-wide font-semibold mb-0.5" style={{ fontSize: 'min(0.75rem, 4cqh)' }}>Waiting</p>
+                  <p className="font-black" style={{ color, fontSize: 'min(1.5rem, 9cqh)' }}>{data.waiting_count ?? 0}</p>
                 </div>
               </div>
             </div>
