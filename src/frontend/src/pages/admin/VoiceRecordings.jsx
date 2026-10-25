@@ -82,7 +82,7 @@ function VoiceRecordings() {
       callEn: s.call_template_en || DEFAULT_TEMPLATES.callEn,     recallEn: s.recall_template_en || DEFAULT_TEMPLATES.recallEn,
       callAr: s.call_template_ar || DEFAULT_TEMPLATES.callAr,     recallAr: s.recall_template_ar || DEFAULT_TEMPLATES.recallAr,
     };
-    setPieces(requiredPieces(templates, depts.data.filter(d => d.is_active), anns.data.filter(a => a.is_active)));
+    setPieces(requiredPieces(templates, depts.data.filter(d => d.is_active), anns.data));
     setManifest(man.data || {});
     loadTakes(man.data || {});
   }, [loadTakes]);

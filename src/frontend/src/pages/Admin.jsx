@@ -1,10 +1,11 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import useAuthStore from '../store/useAuthStore';
-import { useVoiceLock } from '../lib/voiceLock';
+import { useVoiceLock, useWipeLock } from '../lib/voiceLock';
 
 export default function Admin() {
   const user = useAuthStore(state => state.user);
   const voice = useVoiceLock();
+  const wipe = useWipeLock();
   const logout = useAuthStore(state => state.logout);
   const navigate = useNavigate();
 
@@ -37,8 +38,8 @@ export default function Admin() {
               `flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-teal text-white' : 'text-gray-300 hover:bg-white hover:bg-opacity-10'}`
             }>Voice Recordings</NavLink>
           )}
-          {/* Vyra only: needs a license with a voice password, unlocked */}
-          {voice.ready && voice.locked && voice.open && user?.role === 'super_admin' && (
+          {/* Vyra only: needs a license with a Fresh Start password, unlocked with it (not the voice one) */}
+          {wipe.ready && wipe.open && user?.role === 'super_admin' && (
             <NavLink to="/admin/fresh-start" className={({ isActive }) =>
               `flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-teal text-white' : 'text-gray-300 hover:bg-white hover:bg-opacity-10'}`
             }>Fresh Start</NavLink>

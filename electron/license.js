@@ -5,11 +5,12 @@
 //
 // Key = base64(JSON({ ...payload, sig })).
 //   v1 (≤1.11): { v:1, type, school, issued, expires? }   — signature covers v|type|school|issued only
-//   v2:         { v:2, id, type, school, issued, expires?, grace?, devices?, machine?, voicePass? }
+//   v2:         { v:2, id, type, school, issued, expires?, grace?, devices?, machine?, voicePass?, wipePass? }
 //               — signature covers every field. grace = days it keeps working after expires
 //                 (omitted = 0: stops the day after expires); devices omitted = unlimited Staff devices;
 //                 machine = the server PC's Machine ID the key is locked to;
-//                 voicePass = scrypt hash of the Vyra password that opens Voice Recordings.
+//                 voicePass = scrypt hash of the Vyra password that opens Voice Recordings;
+//                 wipePass  = scrypt hash of a DIFFERENT Vyra password that opens Fresh Start (omitted = off).
 // Used by the Electron main process (activation gate), the backend (device limit, License
 // tab) and the License Generator.
 
@@ -83,7 +84,8 @@ function verifyKey(keyString, publicKey = PUBLIC_KEY) {
         || (payload.grace !== undefined && !(Number.isInteger(payload.grace) && payload.grace >= 0 && payload.grace <= MAX_GRACE_DAYS))
         || (payload.devices !== undefined && !(Number.isInteger(payload.devices) && payload.devices > 0))
         || (payload.machine !== undefined && !MACHINE.test(payload.machine))
-        || (payload.voicePass !== undefined && !VOICE_PASS.test(payload.voicePass)))) {
+        || (payload.voicePass !== undefined && !VOICE_PASS.test(payload.voicePass))
+        || (payload.wipePass !== undefined && !VOICE_PASS.test(payload.wipePass)))) {
       return { valid: false, reason: 'Malformed license key' };
     }
     const ok = crypto.verify(null, Buffer.from(canonical(payload)), publicKey, Buffer.from(sig, 'base64'));
@@ -115,6 +117,7 @@ function licenseState(payload, now) {
     devices: payload.v === 2 && payload.devices ? payload.devices : null,   // null = unlimited
     machineLocked: !!payload.machine,
     voiceLocked: !!payload.voicePass,
+    wipeEnabled: !!payload.wipePass,
     version: payload.v,
   };
   if (!payload.expires) return { ...base, status: 'ok', daysLeft: null, graceUntil: null };

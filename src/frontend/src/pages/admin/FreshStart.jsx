@@ -1,9 +1,10 @@
 // Fresh Start (Vyra Systems only): puts this server back to a new install, e.g. after a demo or
-// before handing it to a school. Shown only once Voice Recordings is unlocked with the Vyra password.
+// before handing it to a school. Has its own Vyra password (not the Voice Recordings one) and is
+// off unless the license key carries it.
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { voiceAPI } from '../../lib/api';
-import { useVoiceLock, lockVoice } from '../../lib/voiceLock';
+import { useWipeLock, lockWipe, lockVoice } from '../../lib/voiceLock';
 import useAuthStore from '../../store/useAuthStore';
 import VoiceUnlock from '../../components/VoiceUnlock';
 
@@ -24,10 +25,10 @@ const KEPT = [
 ];
 
 export default function FreshStartPage() {
-  const voice = useVoiceLock();
+  const wipe = useWipeLock();
   const user = useAuthStore(s => s.user);
-  if (!voice.ready) return <div className="animate-pulse h-24 bg-gray-200 rounded-xl max-w-3xl" />;
-  if (!voice.locked || user?.role !== 'super_admin') {
+  if (!wipe.ready) return <div className="animate-pulse h-24 bg-gray-200 rounded-xl max-w-3xl" />;
+  if (!wipe.enabled || user?.role !== 'super_admin') {
     return (
       <div className="max-w-3xl">
         <h2 className="text-2xl font-bold text-navy mb-1">Fresh Start</h2>
@@ -35,12 +36,12 @@ export default function FreshStartPage() {
       </div>
     );
   }
-  if (!voice.open) {
+  if (!wipe.open) {
     return (
       <div className="max-w-3xl">
         <h2 className="text-2xl font-bold text-navy mb-1">Fresh Start</h2>
         <p className="text-sm text-gray-500 mb-6">This page is locked by Vyra Systems.</p>
-        <section className="bg-white rounded-xl shadow-sm p-6"><VoiceUnlock /></section>
+        <section className="bg-white rounded-xl shadow-sm p-6"><VoiceUnlock kind="wipe" /></section>
       </div>
     );
   }
@@ -80,6 +81,7 @@ function WipeDialog({ onClose }) {
     setError('');
     try {
       await voiceAPI.wipe(password);
+      lockWipe();
       lockVoice();
       logout();
       navigate('/login', { replace: true });
@@ -98,7 +100,7 @@ function WipeDialog({ onClose }) {
         <p className="text-sm font-semibold text-gray-700">Kept:</p>
         <ul className="text-sm text-gray-600 list-disc pl-5 mb-4 space-y-0.5">{KEPT.map(t => <li key={t}>{t}</li>)}</ul>
 
-        <label htmlFor="wipe-pass" className="block text-xs font-semibold text-gray-500 mb-1">Voice Recordings password (from Vyra Systems)</label>
+        <label htmlFor="wipe-pass" className="block text-xs font-semibold text-gray-500 mb-1">Fresh Start password (from Vyra Systems)</label>
         <input id="wipe-pass" type="password" value={password} onChange={e => setPassword(e.target.value)} autoFocus autoComplete="off"
           className="w-full px-3 py-2 border rounded-lg text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-teal" />
         <label htmlFor="wipe-confirm" className="block text-xs font-semibold text-gray-500 mb-1">Type WIPE to confirm</label>

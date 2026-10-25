@@ -203,7 +203,7 @@ Jest config: `testEnvironment: node`, `testMatch: **/tests/**/*.test.js`. Note: 
 **Licensing (1.12.0+):**
 - Offline Ed25519 license keys, bound to a machine ID and stored in `%APPDATA%\SchoolQ\license.json`.
 - The **private key** is `.keys/license-private.pem`, with a backup in `key-backup/`. Both are gitignored. **Never commit, ship or print them.**
-- **License Generator** (`dist-generator\SchoolQ License Generator Setup <ver>.exe`) is for the seller's PC only. It sets the seat count and the per-school Voice Recordings password.
+- **License Generator** (`dist-generator\SchoolQ License Generator Setup <ver>.exe`) is for the seller's PC only. It sets the seat count, the per-school Voice Recordings password and a separate Fresh Start password (1.17.0+; no Fresh Start password in the key = Fresh Start off).
 - **Generator history** holds readable passwords, so never commit it.
 
 **Offline voice (1.7.0+):**

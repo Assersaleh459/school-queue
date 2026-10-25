@@ -32,6 +32,8 @@ const expires = opt('--expires');
 const devices = opt('--devices');
 const machine = opt('--machine');
 const voicePass = opt('--voice-pass');
+const wipePass = opt('--wipe-pass');   // Fresh Start password, must differ from --voice-pass
+if (wipePass && wipePass === voicePass) { console.error('--wipe-pass must be different from --voice-pass'); process.exit(1); }
 
 if (!fs.existsSync(PRIVATE_KEY_PATH)) {
   console.error(`Private key not found at ${PRIVATE_KEY_PATH}`);
@@ -55,6 +57,7 @@ const payload = {
   ...(devices && { devices: Number(devices) }),
   ...(machine && { machine: machine.trim().toLowerCase() }),
   ...(voicePass && { voicePass: hashVoicePass(voicePass) }),
+  ...(wipePass && { wipePass: hashVoicePass(wipePass) }),
 };
 
 const key = mintKey(payload, privateKey);
@@ -69,6 +72,7 @@ console.log('Type       :', payload.type + (expires ? ` (expires ${expires})` : 
 console.log('Devices    :', payload.devices || 'unlimited');
 console.log('Locked to  :', payload.machine || 'any PC (no Machine ID given)');
 console.log('Voice page :', voicePass ? 'locked with the password you gave' : 'open');
+console.log('Fresh Start:', wipePass ? 'on, with its own password' : 'off');
 console.log('\n--- LICENSE KEY (give this to the customer) ---\n');
 console.log(key);
 console.log('');

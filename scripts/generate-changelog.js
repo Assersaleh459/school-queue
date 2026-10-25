@@ -1758,6 +1758,25 @@ sub('A real quit (error, Windows shutdown, restore, relaunch) is never blocked')
 sub('Staff windows are unchanged: closing one just closes that app');
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  v1.17.0 — SEPARATE PASSWORD FOR FRESH START
+// ─────────────────────────────────────────────────────────────────────────────
+versionHeader({
+  version: '1.17.0', date: '25 Oct 2026', type: 'minor',
+  commit: 'this release',
+  summary: 'Fresh Start Has Its Own Password, Separate from Voice Recordings; License Generator 1.3.0',
+});
+bullet('Before: one Vyra password opened Voice Recordings and, from there, Fresh Start');
+bullet('Now two passwords, set per school in the License Generator and signed into the key (hashed, the school cannot remove them)');
+sub('Voice Recordings password: opens only Voice Recordings. Fresh Start password: opens only Fresh Start');
+sub('The generator refuses the same password in both fields and anything under 6 characters');
+sub('Fresh Start is off unless the key carries its password. Keys made before 1.17.0 have none, so Fresh Start stays off until a new key');
+bullet('Settings (super admin): two links at the bottom, "Voice tools (Vyra Systems)" and "Fresh Start (Vyra Systems)", each with its own password box');
+sub('Each unlock lasts 12 hours or until Lock again; five wrong tries block that lock for 5 minutes, without blocking the other');
+sub('The Fresh Start tab stays hidden until unlocked; the Erase dialog asks for the Fresh Start password again plus WIPE');
+bullet('License Generator 1.3.0: Fresh Start password field, second Show column in the history, Renew refills both, CSV export column, key summary file');
+bullet('Verified: 29 lock/route/license tests, live test on a test server 25/25 (each password refused by the other page, nothing erased by a wrong one, old key = Fresh Start off), generator test 13/13');
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  SUMMARY PAGE
 // ─────────────────────────────────────────────────────────────────────────────
 newPage();
@@ -1814,6 +1833,7 @@ const timeline = [
   { v:'v1.16.3', date:'25 Oct 2026', type:'fix',      desc:'Long ticket numbers fit on one line, printed and on screen' },
   { v:'v1.16.4', date:'25 Oct 2026', type:'ux',       desc:'Server-not-reachable bar, reload on reconnect, Staff finds a moved server' },
   { v:'v1.16.5', date:'25 Oct 2026', type:'ux',       desc:'Closing the Server window asks first (keep / minimize / stop)' },
+  { v:'v1.17.0', date:'25 Oct 2026', type:'minor',    desc:'Fresh Start has its own password; License Generator 1.3.0' },
 ];
 const tc = { initial:C.navy, patch:C.green, security:C.red, fix:C.amber, minor:C.blue, ux:C.purple };
 timeline.forEach((r, i) => {

@@ -117,4 +117,11 @@ test('voice password: only a hash goes in the key, it is signed, and it checks t
   expect(verifyKey(tamper(key, o => { delete o.voicePass; }), PUB).valid).toBe(false);            // can't unlock by removing it
   expect(verifyKey(tamper(key, o => { o.voicePass = hashVoicePass('mine'); }), PUB).valid).toBe(false);
   expect(verifyKey(mintKey(v2({ voicePass: 'plain text' }), PRIV), PUB).reason).toBe('Malformed license key');
+  // Fresh Start password: same protection, separate field
+  const wipe = hashVoicePass('Fresh#Start9');
+  const key2 = mintKey(v2({ voicePass: hash, wipePass: wipe }), PRIV);
+  expect(verifyKey(key2, PUB).valid).toBe(true);
+  expect(verifyKey(tamper(key2, o => { delete o.wipePass; }), PUB).valid).toBe(false);               // can't switch it off by removing it
+  expect(verifyKey(tamper(key2, o => { o.wipePass = hashVoicePass('mine'); }), PUB).valid).toBe(false);
+  expect(verifyKey(mintKey(v2({ wipePass: 'plain text' }), PRIV), PUB).reason).toBe('Malformed license key');
 });

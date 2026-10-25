@@ -4,28 +4,43 @@ import { DEFAULT_TEMPLATES, missingClips } from '../../lib/voiceClips';
 import { toast } from '../../store/useToastStore';
 import TicketReceipt from '../../components/TicketReceipt';
 import useAuthStore from '../../store/useAuthStore';
-import { useVoiceLock, lockVoice } from '../../lib/voiceLock';
+import { useVoiceLock, lockVoice, useWipeLock, lockWipe } from '../../lib/voiceLock';
 import VoiceUnlock from '../../components/VoiceUnlock';
 import { useNavigate } from 'react-router-dom';
 
-// Small link at the bottom: the Voice Recordings tools are hidden while the license's Vyra
-// password locks them
-function VoiceToolsLock() {
-  const voice = useVoiceLock();
+// Small links at the bottom: Voice Recordings and Fresh Start are hidden while the license's Vyra
+// passwords lock them. Two separate passwords, each opens only its own page.
+function VyraToolLock({ title, openText, onLock, open, kind, goTo }) {
   const navigate = useNavigate();
   const [asking, setAsking] = useState(false);
-  if (!voice.ready || !voice.locked) return null;
+  return open ? (
+    <p>
+      {openText}{' '}
+      <button type="button" onClick={onLock} className="underline hover:text-gray-600">Lock again</button>
+    </p>
+  ) : asking ? (
+    <VoiceUnlock kind={kind} onUnlocked={() => navigate(goTo)} />
+  ) : (
+    <button type="button" onClick={() => setAsking(true)} className="underline hover:text-gray-600">{title}</button>
+  );
+}
+
+function VoiceToolsLock() {
+  const voice = useVoiceLock();
+  const wipe = useWipeLock();
+  const isSuper = useAuthStore(s => s.user?.role === 'super_admin');
+  const showVoice = voice.ready && voice.locked;
+  const showWipe = wipe.ready && wipe.enabled && isSuper;
+  if (!showVoice && !showWipe) return null;
   return (
-    <div className="mt-8 pt-4 border-t border-gray-200 text-xs text-gray-400">
-      {voice.open ? (
-        <p>
-          Voice Recordings is unlocked for this window.{' '}
-          <button type="button" onClick={lockVoice} className="underline hover:text-gray-600">Lock again</button>
-        </p>
-      ) : asking ? (
-        <VoiceUnlock onUnlocked={() => navigate('/admin/voice')} />
-      ) : (
-        <button type="button" onClick={() => setAsking(true)} className="underline hover:text-gray-600">Voice tools (Vyra Systems)</button>
+    <div className="mt-8 pt-4 border-t border-gray-200 text-xs text-gray-400 space-y-2">
+      {showVoice && (
+        <VyraToolLock kind="voice" title="Voice tools (Vyra Systems)" goTo="/admin/voice" open={voice.open} onLock={lockVoice}
+          openText="Voice Recordings is unlocked for this window." />
+      )}
+      {showWipe && (
+        <VyraToolLock kind="wipe" title="Fresh Start (Vyra Systems)" goTo="/admin/fresh-start" open={wipe.open} onLock={lockWipe}
+          openText="Fresh Start is unlocked for this window." />
       )}
     </div>
   );

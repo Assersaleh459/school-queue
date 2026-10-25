@@ -115,6 +115,10 @@
       <input type="text" id="voicePass" placeholder="Leave empty to keep the page open" autocomplete="off" />
       <div class="hint">Hides and locks the Voice Recordings page at this school. Only a scrambled version goes into the key; your history keeps the password for you. To change a school's password: <b>Renew</b> it in the History, type the new password here, and send the new key — it works as soon as the school pastes it in Admin › License.</div>
 
+      <label for="wipePass">Fresh Start password (optional)</label>
+      <input type="text" id="wipePass" placeholder="Leave empty to switch Fresh Start off" autocomplete="off" />
+      <div class="hint">Fresh Start erases all school data, so it has its <b>own password, different from the Voice Recordings one</b>. Without it the key has no Fresh Start at all. Schools never see this page unless you unlock it in Settings. Keep it for yourself — do not give it to the school.</div>
+
       <label for="notes">Notes (only in your history)</label>
       <input type="text" id="notes" placeholder="Invoice no., contact person…" />
 
@@ -145,7 +149,7 @@
     </div>
     <div id="historyEmpty" class="empty" style="padding: 24px 0">No licenses issued yet.</div>
     <table id="historyTable" hidden>
-      <thead><tr><th>No.</th><th>School</th><th>Devices</th><th>Expires</th><th>Issued</th><th>Machine ID</th><th>Voice password</th><th></th></tr></thead>
+      <thead><tr><th>No.</th><th>School</th><th>Devices</th><th>Expires</th><th>Issued</th><th>Machine ID</th><th>Voice password</th><th>Fresh Start password</th><th></th></tr></thead>
       <tbody id="historyRows"></tbody>
     </table>
   </section>
@@ -212,6 +216,7 @@
       expires: type === 'subscription' ? $('expires').value : null,
       grace: type === 'subscription' ? $('grace').value : 0,
       voicePass: $('voicePass').value,
+      wipePass: $('wipePass').value,
       notes: $('notes').value,
     });
     if (res.error) { $('formError').textContent = res.error; return; }
@@ -235,6 +240,7 @@
     add('Staff devices', entry.devices || 'Unlimited');
     add('Machine ID', entry.machine);
     add('Voice Recordings', entry.voicePassword ? `Locked — password: ${entry.voicePassword}` : 'Open (no password)');
+    add('Fresh Start', entry.wipePassword ? `On — password: ${entry.wipePassword}` : 'Off (no password)');
     $('keyOut').value = entry.key;
   }
   $('copyKey').onclick = async () => { await window.gen.copy(current.key); toast('Key copied'); };
@@ -268,14 +274,14 @@
       if (h.expires && h.grace) { const g = document.createElement('div'); g.className = 'hint'; g.textContent = `+${h.grace} days grace`; ex.append(g); }
       td(nice(h.issued));
       const m = td(h.machine.slice(0, 10) + '…', 'mono'); m.title = h.machine;
-      // Voice password: hidden until "Show"
-      const vp = td('');
-      if (!h.voicePassword) { vp.textContent = '—'; vp.style.color = '#9ca3af'; }
-      else {
+      // Voice and Fresh Start passwords: hidden until "Show"
+      for (const pw of [h.voicePassword, h.wipePassword]) {
+        const cell = td('');
+        if (!pw) { cell.textContent = '—'; cell.style.color = '#9ca3af'; continue; }
         const val = document.createElement('span'); val.className = 'mono'; val.textContent = '••••••';
         const show = document.createElement('button'); show.className = 'btn ghost small'; show.textContent = 'Show'; show.style.marginLeft = '6px';
-        show.onclick = () => { const hidden = show.textContent === 'Show'; val.textContent = hidden ? h.voicePassword : '••••••'; show.textContent = hidden ? 'Hide' : 'Show'; };
-        vp.append(val, show);
+        show.onclick = () => { const hidden = show.textContent === 'Show'; val.textContent = hidden ? pw : '••••••'; show.textContent = hidden ? 'Hide' : 'Show'; };
+        cell.append(val, show);
       }
       const act = td('');
       const b1 = document.createElement('button'); b1.className = 'btn ghost small'; b1.textContent = 'Copy key';
@@ -297,6 +303,7 @@
     $('devices').disabled = !h.devices;
     $('devices').value = h.devices || 5;
     $('voicePass').value = h.voicePassword || '';
+    $('wipePass').value = h.wipePassword || '';
     $('notes').value = h.notes ? `Renewal of ${h.id} — ${h.notes}` : `Renewal of ${h.id}`;
     $('grace').value = h.grace || 0;
     if (h.expires) {

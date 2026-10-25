@@ -93,6 +93,13 @@ test('requiredPieces covers templates, departments and announcements, tagged by 
   ]);
 });
 
+test('requiredPieces and unrecordedTexts include announcements hidden from the display', () => {
+  const hidden = { message_text: 'Fire drill today', speak_language: 'en', is_active: 0 };
+  assert.deepEqual(requiredPieces({ callEn: '', recallEn: '', callAr: '', recallAr: '' }, [], [hidden]),
+    [{ lang: 'en', text: 'Fire drill today', source: 'announcement' }]);
+  assert.deepEqual(unrecordedTexts(hidden, {}), [{ lang: 'en', text: 'Fire drill today' }]);
+});
+
 test('buildPlan uses the active voice folders from the manifest', () => {
   const custom = { voice: 'Yasmin', clips: '/api/voice/clips/Yasmin', numbers: '/api/voice/clips/Yasmin', ar: { 'رقم': 'ar-x.ogg' } };
   assert.deepEqual(buildPlan('رقم {ticket}', { number: 125 }, 'ar', custom), [

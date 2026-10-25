@@ -100,7 +100,7 @@ To stop a school from changing voices, type a **Voice Recordings password** in t
 - **To change a school's password:** in the generator's History, press **Renew** on that school. Type the new password (or clear it to remove the lock), **Generate**, and send the key. The school pastes it in **Admin → License → Renew or upgrade**. From that moment:
   - the old password stops working;
   - anyone who had unlocked the page is locked out again.
-- The generator shows its version in the header. The password field needs **License Generator 1.1.0** or later; if you don't see it, install the new generator over the old one (your history is kept).
+- The generator shows its version in the header. The Voice Recordings password field needs **License Generator 1.1.0** or later; the separate **Fresh Start password** (below) needs **1.3.0** or later. If you don't see a field, install the new generator over the old one (your history is kept).
 
 ---
 
@@ -108,9 +108,11 @@ To stop a school from changing voices, type a **Voice Recordings password** in t
 
 Use it after a demo, or before you hand a used server to a school.
 
-- It works only when the license has a **Voice Recordings password**. Without one, the tab doesn't exist.
-- Sign in as the **super admin**. Unlock the voice tools (**Settings → "Voice tools (Vyra Systems)"**). A **Fresh Start** tab then shows under Voice Recordings.
-- Press **Erase all data…**, enter the Voice Recordings password again, and type `WIPE`.
+- It has its **own password, different from the Voice Recordings password** (1.17.0+). Type it in the **Fresh Start password** field of the generator (License Generator 1.3.0+). The two passwords can't be the same, and the Voice Recordings password never opens Fresh Start.
+- Without a Fresh Start password in the key, Fresh Start is **off**: the tab doesn't exist and the server refuses to erase. **Keys made before 1.17.0 have none**, so make a new key (Renew in the History, add the password) if you need it at that school.
+- Keep this password for yourself. Don't give it to the school.
+- Sign in as the **super admin**. Go to **Settings → "Fresh Start (Vyra Systems)"** (bottom of the page, under the Voice tools link) and enter the Fresh Start password. A **Fresh Start** tab then shows in the Admin Panel until **Lock again**, closing SchoolQ, or 12 hours.
+- Press **Erase all data…**, enter the Fresh Start password again, and type `WIPE`. Five wrong tries block it for 5 minutes (this does not block Voice Recordings).
 - **Erased:** tickets and reports, departments and services, all users, announcements, the audit log, staff devices, settings (the name goes back to "My School") and voice recordings.
 - **Kept:** the license, the voice engine, and a copy of the old database and voice folder in `%APPDATA%\SchoolQ\backups\before-wipe\`.
 - Everyone is signed out. Sign in again as `admin` / `admin123`; the app asks for a new password.
@@ -150,7 +152,7 @@ Tick each step before you leave the school.
 
 **On the server PC**
 - [ ] Install SchoolQ Server and choose **Server** on the first-time setup screen.
-- [ ] Send yourself the **Machine ID** from the activation screen. Make the key in the License Generator (seats, expiry, Voice Recordings password). Paste it and press **Activate**.
+- [ ] Send yourself the **Machine ID** from the activation screen. Make the key in the License Generator (seats, expiry, Voice Recordings password, and the Fresh Start password if you need it). Paste it and press **Activate**.
 - [ ] Sign in as `admin` / `admin123`. The app asks for a new password at once (1.15.2+) and nothing else works until it is changed. Give the new password only to the school's admin.
 - [ ] **Admin → Settings:** set the school name (new installs start as "My School"), colours, logo and working hours.
 - [ ] **Admin → Departments:** add the school's departments and their services. A new install starts with none (only the `admin` user).

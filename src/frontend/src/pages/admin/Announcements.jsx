@@ -168,7 +168,7 @@ export default function Announcements({ announceOnly = false }) {
                   {LANG_LABELS[a.speak_language || 'en']}
                 </span>
                 <p className="font-semibold text-gray-800 truncate">{a.message_text}</p>
-                {!!a.is_active && notRecorded(a) && (
+                {notRecorded(a) && (
                   <span className="shrink-0 text-xs font-semibold px-2 py-0.5 rounded bg-amber-100 text-amber-800" title={notRecordedHint(recorded.voice)}>
                     🎙 Not recorded
                   </span>

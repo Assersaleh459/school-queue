@@ -54,7 +54,7 @@ const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const MACHINE = /^[0-9a-f]{32}$/;
 
-// form: { school, machine, devices (number|null = unlimited), expires (YYYY-MM-DD|null), grace (days), voicePass, notes }
+// form: { school, machine, devices (number|null = unlimited), expires (YYYY-MM-DD|null), grace (days), voicePass, wipePass, notes }
 ipcMain.handle('gen:mint', (e, form) => {
   const st = keyState();
   if (!st.keyOk) return { error: st.reason };
@@ -64,12 +64,15 @@ ipcMain.handle('gen:mint', (e, form) => {
   const expires = form.expires || null;
   const grace = expires && form.grace !== '' && form.grace != null ? Number(form.grace) : 0;
   const voicePass = String(form.voicePass || '');
+  const wipePass = String(form.wipePass || '');
   if (!school) return { error: 'Enter the school name' };
   if (!MACHINE.test(machine)) return { error: 'The Machine ID is 32 characters (0-9, a-f) — copy it from the school\'s activation screen' };
   if (devices !== null && !(Number.isInteger(devices) && devices >= 1 && devices <= 999)) return { error: 'Staff devices must be a whole number from 1 to 999' };
   if (expires && (!DATE.test(expires) || expires <= today())) return { error: 'The expiry date must be in the future' };
   if (!(Number.isInteger(grace) && grace >= 0 && grace <= MAX_GRACE_DAYS)) return { error: `The grace period must be a whole number of days from 0 to ${MAX_GRACE_DAYS}` };
   if (voicePass && voicePass.length < 6) return { error: 'The Voice Recordings password needs at least 6 characters' };
+  if (wipePass && wipePass.length < 6) return { error: 'The Fresh Start password needs at least 6 characters' };
+  if (wipePass && wipePass === voicePass) return { error: 'The Fresh Start password must be different from the Voice Recordings password' };
 
   const payload = {
     v: 2,
@@ -81,14 +84,15 @@ ipcMain.handle('gen:mint', (e, form) => {
     ...(grace && { grace }),
     ...(devices && { devices }),
     machine,
-    ...(voicePass && { voicePass: hashVoicePass(voicePass) }),   // only the hash goes to the school
+    ...(voicePass && { voicePass: hashVoicePass(voicePass) }),   // only the hashes go to the school
+    ...(wipePass && { wipePass: hashVoicePass(wipePass) }),
   };
   const key = mintKey(payload, fs.readFileSync(st.keyPath, 'utf8'));
   if (!verifyKey(key).valid) return { error: 'The key did not verify — check the signing key file' };
 
   // History (on this PC only) keeps the readable password, so you can look it up and renew with it
-  const { voicePass: _hash, ...rest } = payload;
-  const entry = { ...rest, voicePassword: voicePass || null, notes: String(form.notes || '').trim(), key, createdAt: new Date().toISOString() };
+  const { voicePass: _hash, wipePass: _wipeHash, ...rest } = payload;
+  const entry = { ...rest, voicePassword: voicePass || null, wipePassword: wipePass || null, notes: String(form.notes || '').trim(), key, createdAt: new Date().toISOString() };
   writeJson(historyFile(), [entry, ...readJson(historyFile(), [])]);
   return { entry };
 });
@@ -113,6 +117,7 @@ ipcMain.handle('gen:saveKey', async (e, entry) => {
     `Staff devices: ${entry.devices || 'unlimited'}`,
     `Server Machine ID: ${entry.machine}`,
     `Voice Recordings page: ${entry.voicePassword ? 'locked (password from Vyra Systems)' : 'open'}`,
+    `Fresh Start: ${entry.wipePassword ? 'on (own password from Vyra Systems)' : 'off'}`,
     '',
     'Paste this key on the SchoolQ Server activation screen (or Admin > License > Renew):',
     '',
@@ -131,8 +136,8 @@ ipcMain.handle('gen:exportCsv', async (e) => {
   });
   if (canceled || !filePath) return false;
   const cell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const head = ['License No.', 'School', 'Type', 'Issued', 'Expires', 'Grace days', 'Staff devices', 'Machine ID', 'Voice password', 'Notes', 'Key'];
-  const lines = rows.map(r => [r.id, r.school, r.type, r.issued, r.expires || '', r.expires ? (r.grace || 0) : '', r.devices || 'unlimited', r.machine, r.voicePassword || '', r.notes, r.key].map(cell).join(','));
+  const head = ['License No.', 'School', 'Type', 'Issued', 'Expires', 'Grace days', 'Staff devices', 'Machine ID', 'Voice password', 'Fresh Start password', 'Notes', 'Key'];
+  const lines = rows.map(r => [r.id, r.school, r.type, r.issued, r.expires || '', r.expires ? (r.grace || 0) : '', r.devices || 'unlimited', r.machine, r.voicePassword || '', r.wipePassword || '', r.notes, r.key].map(cell).join(','));
   fs.writeFileSync(filePath, '﻿' + [head.map(cell).join(','), ...lines].join('\r\n'), 'utf8');   // BOM: Excel reads Arabic names
   return true;
 });

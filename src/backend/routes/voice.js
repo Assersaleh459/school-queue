@@ -246,13 +246,29 @@ router.post('/unlock', [authMiddleware, requireRole('super_admin', 'admin')], (r
 });
 
 // ── Fresh start (Vyra only) ──────────────────────────────────────────────────
+// Its own password (wipePass in the license), separate from the Voice Recordings one.
+// Without it in the key, Fresh Start is off: any admin could otherwise erase the school.
 
-// { password, confirm: 'WIPE' } — puts the server back to a new install (see wipe.js). Only when
-// the license has a Vyra password (else any admin could do it), and that password is asked again.
-router.post('/wipe', [authMiddleware, requireRole('super_admin'), voiceLock.voiceGuard], async (req, res) => {
-  if (!voiceLock.isLocked()) return res.status(403).json({ error: 'Fresh Start needs a license with a Voice Recordings password' });
+const wipeLock = voiceLock.wipe;
+
+router.get('/wipe/lock', authMiddleware, (req, res) => res.json({ enabled: wipeLock.isLocked() }));
+
+router.post('/wipe/unlock', [authMiddleware, requireRole('super_admin')], (req, res) => {
+  if (!wipeLock.isLocked()) return res.status(403).json({ error: 'Fresh Start needs a license with a Fresh Start password' });
+  const r = wipeLock.unlock(req.user.user_id, req.body.password);
+  log(req.user.user_id, r.ok ? 'WIPE_UNLOCKED' : 'WIPE_UNLOCK_FAILED', 'system', null, {});
+  if (!r.ok) return res.status(r.wait ? 429 : 403).json({ error: r.error });
+  res.json({ success: true, token: r.token });
+});
+
+// { password, confirm: 'WIPE' } — puts the server back to a new install (see wipe.js). Needs the
+// Fresh Start unlock, and the Fresh Start password is asked again.
+router.post('/wipe', [authMiddleware, requireRole('super_admin'), (req, res, next) => {
+  if (!wipeLock.isLocked()) return res.status(403).json({ error: 'Fresh Start needs a license with a Fresh Start password' });
+  wipeLock.guard(req, res, next);
+}], async (req, res) => {
   if (req.body.confirm !== 'WIPE') return res.status(422).json({ error: 'Type WIPE to confirm' });
-  const r = voiceLock.unlock(req.user.user_id, req.body.password);
+  const r = wipeLock.unlock(req.user.user_id, req.body.password);
   if (!r.ok) {
     log(req.user.user_id, 'DATA_WIPE_FAILED', 'system', null, {});
     return res.status(r.wait ? 429 : 403).json({ error: r.error });
